@@ -6,8 +6,12 @@ import bcrypt from 'bcrypt';
 import db from './db';
 import cors from 'cors';
 import { Pool } from 'pg';
+import multer from 'multer';
+import { put } from '@vercel/blob';
 import * as Sentry from '@sentry/node';
 import '@sentry/tracing';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || '<YOUR_SENTRY_DSN>',
@@ -104,6 +108,18 @@ app.post('/api/auth/register', async (req, res) => {
       message: 'Internal server error',
     });
   }
+});
+
+app.post('/api/get-url', upload.single('file'), async (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const blob = await put(`products/${file.originalname}`, file.buffer, {
+    access: 'public',
+    token: process.env.BLOB_READ_WRITE_TOKEN!,
+  });
+
+  res.status(200).json({ url: blob.url });
 });
 
 // Add health check route

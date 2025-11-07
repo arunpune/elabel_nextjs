@@ -170,4 +170,12 @@ export const categoryOptions = [
 
 export const wineTypeOptions = ['Red Wine', 'White Wine', 'Rosé', 'Champagne', 'Sparkling'];
 
-export const operatorTypeOptions = ['Producer', 'Distributor', 'Retailer'];
+export const operatorTypeOptions = [
+  'None',
+  'Bottler',
+  'Packager',
+  'Producer',
+  'Vendor',
+  'Importer',
+  'Producer and Bottler',
+];

@@ -1,17 +1,12 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -20,10 +15,18 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { wineTypeOptions, operatorTypeOptions } from '@/lib/mock-data';
-import { insertProductSchema } from '@shared/schema';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { operatorTypeOptions, wineTypeOptions } from '@/lib/mock-data';
 import type { Product } from '@shared/schema';
+import { insertProductSchema } from '@shared/schema';
+import { apiRequest } from '@/lib/queryClient';
+import { Label } from '../ui/label';
 
 const productFormSchema = insertProductSchema;
 type ProductFormData = z.infer<typeof productFormSchema>;
@@ -101,10 +104,15 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. Chateau Margaux" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        This is the name of the product as you have it on your bottle, without the
+                        vintage.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="brand"
@@ -114,6 +122,9 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. Margaux Estate" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Brand, producer or product marketing name.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -127,11 +138,14 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. 750ml" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Enter the volume of the liquid in liters.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
+                {/*<FormField
                   control={form.control}
                   name="sku"
                   render={({ field }) => (
@@ -156,7 +170,7 @@ export default function ProductForm({
                       <FormMessage />
                     </FormItem>
                   )}
-                />
+                />*/}
               </div>
             </CardContent>
           </Card>
@@ -177,6 +191,9 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. 2019" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        The year that the wine was produced. Do not fill for non-vintage wines.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -196,6 +213,10 @@ export default function ProductForm({
                             <SelectValue placeholder="Select wine type" />
                           </SelectTrigger>
                         </FormControl>
+                        <Label className="text-xs text-muted-foreground">
+                          Wine classification by vinification process. Sometimes refered as wine
+                          'colour'.
+                        </Label>
                         <SelectContent>
                           {wineTypeOptions.map((type) => (
                             <SelectItem key={type} value={type}>
@@ -217,6 +238,10 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. Dry, Brut" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Sugar content of the wine product, according to EU Regulation No 2019/33,
+                        ANNEX III.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -230,6 +255,9 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. Bordeaux AOC" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Wine legally defined and protected geographical indication.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -243,11 +271,14 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. 13.5%" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Alcohol on label (% vol.)
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
+                {/*<FormField
                   control={form.control}
                   name="countryOfOrigin"
                   render={({ field }) => (
@@ -259,7 +290,7 @@ export default function ProductForm({
                       <FormMessage />
                     </FormItem>
                   )}
-                />
+                />*/}
               </div>
             </CardContent>
           </Card>
@@ -267,7 +298,7 @@ export default function ProductForm({
           {/* Packaging */}
           <Card>
             <CardHeader>
-              <CardTitle>Packaging</CardTitle>
+              <CardTitle>Ingredients</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <FormField
@@ -277,8 +308,20 @@ export default function ProductForm({
                   <FormItem>
                     <FormLabel>Packaging Gases</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g. Nitrogen, Carbon dioxide" />
+                      <select
+                        {...field}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="">None</option>
+                        <option value="may_happen">
+                          Bottling may happen in a protective atmosphere
+                        </option>
+                        <option value="bottled">Bottled in a protective atmosphere</option>
+                      </select>
                     </FormControl>
+                    <Label className="text-xs text-muted-foreground">
+                      Select an option for bottling atmosphere.
+                    </Label>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -302,11 +345,14 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. 100ml" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Volume of a portion (ml)
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
+                {/*<FormField
                   control={form.control}
                   name="kcal"
                   render={({ field }) => (
@@ -318,20 +364,48 @@ export default function ProductForm({
                       <FormMessage />
                     </FormItem>
                   )}
-                />
-                <FormField
-                  control={form.control}
-                  name="kj"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Energy (kJ)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. 356" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                />*/}
+                <div className="flex gap-4">
+                  <FormField
+                    control={form.control}
+                    name="kcal"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Energy (kcal)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            placeholder="e.g. 85"
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              field.onChange(value);
+                              form.setValue(
+                                'kj',
+                                value ? (parseFloat(value) * 4.184).toFixed(2) : '',
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="kj"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Energy (kJ)</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" placeholder="Auto calculated" readOnly />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="fat"
@@ -341,6 +415,7 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. 0g" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">Fat (g)</Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -354,7 +429,135 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. 2.6g" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">Carbohydrates (g)</Label>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="saturates"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Saturates</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. 2.6g" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">Saturated fat (g)</Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="sugar"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sugar</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. 2.6g" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">Sugar (g)</Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="protein"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Protein</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. 2.6g" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">Protein (g)</Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="salt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salt</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. 2.6g" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">Salt (g)</Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Responsible Consumption */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Responsible Consumption</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="pregnancyWarning"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between space-x-6">
+                      <div className="flex items-center space-x-4">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Warning against drinking during pregnancy</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Don&apos;t drink during pregnancy and breastfeeding
+                          </p>
+                        </div>
+                      </div>
+                      <img src="/pregnancy.svg" alt="Pregnancy warning" className="w-10 h-10" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ageWarning"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between space-x-6">
+                      <div className="flex items-center space-x-4">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Warning against drinking below legal age</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Don&apos;t drink when below legal drinking age
+                          </p>
+                        </div>
+                      </div>
+                      <img src="/below18.svg" alt="Age warning" className="w-10 h-10" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="drivingWarning"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between space-x-6">
+                      <div className="flex items-center space-x-4">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Warning against drinking when driving</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Don&apos;t drink when driving a car, motorbike or operating machinery
+                          </p>
+                        </div>
+                      </div>
+                      <img src="/nocar.svg" alt="Driving warning" className="w-10 h-10" />
                     </FormItem>
                   )}
                 />
@@ -368,18 +571,24 @@ export default function ProductForm({
               <CardTitle>Certifications</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-6">
                 <FormField
                   control={form.control}
                   name="organic"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Organic</FormLabel>
+                    <FormItem className="flex flex-row items-center justify-between space-x-4">
+                      <div className="flex items-center space-x-4">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Organic</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Certified organic based on EU-Guidelines
+                          </p>
+                        </div>
                       </div>
+                      <img src="/organic.svg" alt="Organic logo" className="w-10 h-10" />
                     </FormItem>
                   )}
                 />
@@ -387,13 +596,19 @@ export default function ProductForm({
                   control={form.control}
                   name="vegetarian"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Vegetarian</FormLabel>
+                    <FormItem className="flex flex-row items-center justify-between space-x-4">
+                      <div className="flex items-center space-x-4">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Vegetarian</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Certified Vegetarian by V-Label
+                          </p>
+                        </div>
                       </div>
+                      <img src="/veg.svg" alt="Vegetarian logo" className="w-10 h-10" />
                     </FormItem>
                   )}
                 />
@@ -401,13 +616,19 @@ export default function ProductForm({
                   control={form.control}
                   name="vegan"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Vegan</FormLabel>
+                    <FormItem className="flex flex-row items-center justify-between space-x-4">
+                      <div className="flex items-center space-x-4">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Vegan</FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Certified Vegan by V-Label
+                          </p>
+                        </div>
                       </div>
+                      <img src="/vegan.svg" alt="Vegan logo" className="w-10 h-10" />
                     </FormItem>
                   )}
                 />
@@ -419,6 +640,10 @@ export default function ProductForm({
           <Card>
             <CardHeader>
               <CardTitle>Food Business Operator</CardTitle>
+              <CardDescription>
+                Operator under whose name or business name the food is marketed or, if that operator
+                is not established in the Union, the importer into the Union market.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -437,6 +662,9 @@ export default function ProductForm({
                             <SelectValue placeholder="Select operator type" />
                           </SelectTrigger>
                         </FormControl>
+                        <Label className="text-xs text-muted-foreground">
+                          Indication of the bottler, producer, importer or vendor.
+                        </Label>
                         <SelectContent>
                           {operatorTypeOptions.map((type) => (
                             <SelectItem key={type} value={type}>
@@ -458,6 +686,9 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} placeholder="e.g. Wine Company Ltd." />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Food business operator name.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -476,6 +707,9 @@ export default function ProductForm({
                         className="h-20"
                       />
                     </FormControl>
+                    <Label className="text-xs text-muted-foreground">
+                      Food business operator address.
+                    </Label>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -493,10 +727,74 @@ export default function ProductForm({
                         className="h-20"
                       />
                     </FormControl>
+                    <Label className="text-xs text-muted-foreground">
+                      Optional indications, like a code, VAT number or additional Impressum
+                      information.
+                    </Label>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Logistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Logistics</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="countryOfOrigin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country of Origin</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. France" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Enter the ISO 3166-1 two-letter contry code.
+                      </Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="sku"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>SKU</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. WIN-001" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Enter your internal Stock Keeping Unit (SKU) text code.
+                      </Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ean"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>EAN/GTIN</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. 1234567890123" />
+                      </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Enter your European Article Number (EAN) or Global Trade Item Number (GTIN)
+                        of your product.
+                      </Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -516,6 +814,10 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} type="url" placeholder="https://example.com/product" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Current link already printed in your label from an external URL shortening
+                        service, like Bitly, so you can manage all QR Codes in Open E-Label.
+                      </Label>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -529,6 +831,57 @@ export default function ProductForm({
                       <FormControl>
                         <Input {...field} type="url" placeholder="https://redirect.com/product" />
                       </FormControl>
+                      <Label className="text-xs text-muted-foreground">
+                        Redirect/forward this label page to a different e-label site (for
+                        portability).
+                      </Label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="imageUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Image</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+
+                            const formData = new FormData();
+                            formData.append('file', file);
+
+                            try {
+                              const url = await fetch('/api/get-url', {
+                                method: 'POST',
+                                body: formData,
+                              });
+
+                              const data = await url.json();
+                              field.onChange(data.url); // store URL in form state
+                            } catch (error) {
+                              console.error('Upload failed:', error);
+                              alert('Image upload failed. Please try again.');
+                            }
+                          }}
+                        />
+                      </FormControl>
+
+                      {field.value && (
+                        <div className="mt-2">
+                          <img
+                            src={field.value}
+                            alt="Uploaded"
+                            className="w-32 h-32 object-cover rounded-md border"
+                          />
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}

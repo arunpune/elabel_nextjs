@@ -1,3 +1,4 @@
+import { useLocation } from 'wouter';
 import { Switch, Route } from 'wouter';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -18,16 +19,17 @@ import EditIngredientPage from '@/pages/EditIngredientPage';
 import EditProductPage from '@/pages/EditProductPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import NotFound from '@/pages/not-found';
+import PublicProductPage from './pages/PublicProductPage';
 
 function Router() {
   return (
     <Switch>
-      {' '}
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/auth/callback" component={AuthCallbackPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/qr/product/:id" component={PublicProductPage} />
       <Route path="/products">
         <ProtectedRoute>
           <ProductsPage />
@@ -69,11 +71,15 @@ function Router() {
 }
 
 function App() {
+  const [location] = useLocation();
+
+  const isPublicPage = location.startsWith('/qr/product/');
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="min-h-screen bg-gray-50">
-          <Navigation />
+          {!isPublicPage && <Navigation />}
           <Router />
         </div>
         <Toaster />
