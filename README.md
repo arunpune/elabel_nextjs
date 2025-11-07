@@ -1,4 +1,4 @@
-# Wine Inventory Management System
+# Wine  Label Management System (React)
 
 A full-stack web application for managing wine products and ingredients with import/export functionality.
 
