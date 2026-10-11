@@ -46,8 +46,9 @@ export function useDppBase() {
   return pickPublicBase(data?.publicUrl, origin);
 }
 
-/** URL the printed QR code opens: the public DPP page. */
-export function useDppUrl(productId?: number) {
+/** URL the printed QR code opens: the public DPP page. Prefers permanent stored qrUrl from database. */
+export function useDppUrl(productId?: number, storedQrUrl?: string | null) {
+  if (storedQrUrl) return storedQrUrl;
   const base = useDppBase();
   return productId ? `${base}/qr/product/${productId}?src=qr` : '';
 }
@@ -138,7 +139,8 @@ const OPERATOR_LABEL: Record<string, string> = {
 type Props = { product: ProductWithIngredients; qrUrl: string; className?: string };
 
 const WineLabel = forwardRef<SVGSVGElement, Props>(({ product: p, qrUrl, className }, ref) => {
-  const qr = qrUrl ? qrPath(qrUrl) : null;
+  const effectiveQr = qrUrl || p.qrUrl;
+  const qr = effectiveQr ? qrPath(effectiveQr) : null;
   const inner = W - PAD * 2;
 
   const nameLines = wrap(toWords(p.name), inner, 7, 2);

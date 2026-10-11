@@ -103,17 +103,19 @@ export default function ProductsTable({
                       Preview
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() =>
-                        window.open(`${dppBase}/qr/product/${product.id}?src=qr`, '_blank')
-                      }
+                      onClick={() => {
+                        const url = product.qrUrl || `${dppBase}/qr/product/${product.id}?src=qr`;
+                        window.open(url, '_blank');
+                      }}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Public passport
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() =>
-                        downloadQrPng(`${dppBase}/qr/product/${product.id}?src=qr`, `${fileSafe(product.name)}-dpp-qr.png`)
-                      }
+                      onClick={() => {
+                        const url = product.qrUrl || `${dppBase}/qr/product/${product.id}?src=qr`;
+                        downloadQrPng(url, `${fileSafe(product.name)}-dpp-qr.png`);
+                      }}
                     >
                       <Download className="mr-2 h-4 w-4" />
                       Download QR code (PNG)

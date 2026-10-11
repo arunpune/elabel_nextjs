@@ -348,6 +348,20 @@ export default function ProductPreviewModal({
                 <h4 className="font-medium mb-2">Packaging Gases</h4>
                 <p className="text-sm text-muted-foreground">{product.packagingGases || 'Not specified'}</p>
               </div>
+              {product.qrUrl && (
+                <div className="col-span-2">
+                  <h4 className="font-medium mb-2">Public Passport Link (Permanent QR)</h4>
+                  <a
+                    href={product.qrUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-primary hover:underline flex items-center gap-1.5 break-all"
+                  >
+                    {product.qrUrl}
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>
