@@ -165,9 +165,8 @@ updates. Never commit `.env`.
    - [ ] If `SENTRY_AUTH_TOKEN` is set: the issue's stack trace shows real file names
      (e.g. `PublicProductPage.tsx`), not only `index-….js`.
 
-Limit: Sentry currently reports **browser** errors only. The server sends errors to Sentry only in
-the dev server (`server/index.ts`, via `SENTRY_DSN`), not in the production server
-(`server/production.ts`) that Render and Docker run.
+Both the browser (via `VITE_SENTRY_DSN`) and backend Express server (via `SENTRY_DSN`) report
+unhandled errors and exceptions to Sentry in development and production (`server/production.ts`).
 
 ## Local development
 

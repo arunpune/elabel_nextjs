@@ -1,11 +1,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import type { Product } from '@shared/schema';
+import type { Product, ProductWithIngredients, Ingredient } from '@shared/schema';
 import { ExternalLink } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { PACKAGING_GASES } from '@/components/label/WineLabel';
 
 interface ProductPreviewModalProps {
-  product: Product | null;
+  product: (Product & Partial<ProductWithIngredients>) | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -15,7 +17,22 @@ export default function ProductPreviewModal({
   isOpen,
   onClose,
 }: ProductPreviewModalProps) {
+  const { data: allIngredients = [] } = useQuery<Ingredient[]>({
+    queryKey: ['/api/ingredients'],
+    enabled: isOpen && !product?.ingredients && !!product?.ingredientIds?.length,
+  });
+
   if (!product) return null;
+
+  const ingredients =
+    product.ingredients ||
+    (product.ingredientIds?.length
+      ? (product.ingredientIds
+          .map((id) => allIngredients.find((i) => i.id === id))
+          .filter(Boolean) as Ingredient[])
+      : []);
+
+  const allergens = Array.from(new Set(ingredients.flatMap((i) => i.allergens || [])));
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -57,6 +74,35 @@ export default function ProductPreviewModal({
               <p className="text-muted-foreground">{product.wineType || 'Not specified'}</p>
             </div>
           </div>
+
+          {/* Ingredients */}
+          {ingredients.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Ingredients</h3>
+                <p className="leading-relaxed">
+                  {ingredients.map((ing, i) => (
+                    <span key={ing.id} className={ing.allergens?.length ? 'font-bold' : undefined}>
+                      {ing.name}
+                      {ing.eNumber && ` (${ing.eNumber})`}
+                      {i < ingredients.length - 1 ? ', ' : '.'}
+                    </span>
+                  ))}
+                </p>
+                {allergens.length > 0 && (
+                  <p className="mt-3 rounded-md border-l-4 border-primary bg-primary/5 px-3 py-2 text-sm">
+                    <span className="font-semibold">Contains:</span> {allergens.join(', ')}
+                  </p>
+                )}
+                {product.packagingGases && PACKAGING_GASES[product.packagingGases] && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {PACKAGING_GASES[product.packagingGases]}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           <Separator />
 

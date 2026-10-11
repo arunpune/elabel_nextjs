@@ -552,8 +552,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (product.imageUrl) {
-        // Delete the image file from disk
-        const imagePath = path.join(process.cwd(), product.imageUrl);
+        // Delete the image file from disk if stored in local uploads
+        const filename = path.basename(product.imageUrl);
+        const imagePath = path.join(uploadsDir, filename);
         if (fs.existsSync(imagePath)) {
           fs.unlinkSync(imagePath);
         }
