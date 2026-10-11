@@ -25,7 +25,7 @@ async function refreshSessionToken(): Promise<string | null> {
 
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const { data } = await supabase.auth.getSession();
-  let session = data?.session;
+  const session = data?.session;
   let token = session?.access_token;
 
   // If token exists and is about to expire or already expired, proactively refresh
@@ -55,7 +55,9 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
       console.warn('Session has expired and could not be refreshed. Logging out.');
       try {
         await useAuth.getState().logout();
-      } catch {}
+      } catch (err) {
+        console.debug('Error logging out during 401 recovery:', err);
+      }
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login?expired=1';
       }
