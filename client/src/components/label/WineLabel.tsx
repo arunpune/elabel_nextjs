@@ -48,8 +48,8 @@ export function useDppBase() {
 
 /** URL the printed QR code opens: the public DPP page. Prefers permanent stored qrUrl from database. */
 export function useDppUrl(productId?: number, storedQrUrl?: string | null) {
-  if (storedQrUrl) return storedQrUrl;
   const base = useDppBase();
+  if (storedQrUrl) return storedQrUrl;
   return productId ? `${base}/qr/product/${productId}?src=qr` : '';
 }
 

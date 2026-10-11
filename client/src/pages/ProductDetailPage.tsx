@@ -52,7 +52,7 @@ export default function ProductDetailPage() {
     queryFn: () => apiRequest(`/api/products/${params?.id}`),
     enabled: !!params?.id,
   });
-  const dppUrl = product?.qrUrl || useDppUrl(product?.id);
+  const dppUrl = useDppUrl(product?.id, product?.qrUrl);
 
   const deleteProductMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/products/${id}`, { method: 'DELETE' }),
