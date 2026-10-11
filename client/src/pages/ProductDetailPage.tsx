@@ -396,7 +396,7 @@ export default function ProductDetailPage() {
                 </Button>
               </div>
               <Button variant="outline" asChild>
-                <a href={dppUrl.replace('?src=qr', '')} target="_blank" rel="noreferrer">
+                <a href={dppUrl} target="_blank" rel="noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Open public passport
                 </a>

@@ -96,9 +96,7 @@ explains every variable. The ones that matter most:
 | `BASE_URL` | The public address of the site, e.g. `https://wine-label-management-system.onrender.com`. |
 | `SCANS_EXPORT_KEY` | Optional. Any secret string. It turns on the scan-location export (`/api/scans.geojson`). Leave it empty to keep the export off. |
 
-**QR codes never contain localhost.** A QR uses the first public address among `BASE_URL`, the
-address the dashboard is opened on, and the live site above. A QR made on a local copy therefore
-still opens on the live site, which shares the same database.
+**QR codes and Public Passport URLs match your active environment.** When accessing the application on localhost, Docker, or Render, the QR code and public passport links automatically use the exact URL/origin you are accessing the dashboard from (e.g. `http://localhost:5000` locally/in Docker, or `https://wine-label-management-system.onrender.com` on Render). This allows seamless local testing, Docker container workflows, and production deployments without hardcoded redirects.
 
 **Database changes apply themselves.** On start, the server runs the re-runnable SQL files in
 `server/db/` (`server/migrate.ts`); the log shows `Database schema is up to date`. Only

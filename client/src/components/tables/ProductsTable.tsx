@@ -102,7 +102,11 @@ export default function ProductsTable({
                       <Eye className="mr-2 h-4 w-4" />
                       Preview
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.open(`/qr/product/${product.id}`, '_blank')}>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        window.open(`${dppBase}/qr/product/${product.id}?src=qr`, '_blank')
+                      }
+                    >
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Public passport
                     </DropdownMenuItem>
