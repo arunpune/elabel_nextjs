@@ -194,7 +194,7 @@ export default function IngredientForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading} className="bg-accent hover:bg-accent/90">
+          <Button type="submit" disabled={isLoading}>
             {isLoading ? 'Saving...' : ingredient ? 'Update Ingredient' : 'Save Ingredient'}
           </Button>
         </div>
