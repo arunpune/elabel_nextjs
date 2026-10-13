@@ -128,7 +128,9 @@ export default function ProductForm({
         form.setValue('manufacturingCountry', loc.manufacturingCountry, { shouldDirty: true });
       }
       if (loc.manufacturingPostalCode) {
-        form.setValue('manufacturingPostalCode', loc.manufacturingPostalCode, { shouldDirty: true });
+        form.setValue('manufacturingPostalCode', loc.manufacturingPostalCode, {
+          shouldDirty: true,
+        });
       }
       if (loc.manufacturingLocation) {
         form.setValue('manufacturingLocation', loc.manufacturingLocation, { shouldDirty: true });
@@ -264,7 +266,7 @@ export default function ProductForm({
                         <Input {...field} placeholder="e.g. 750ml" />
                       </FormControl>
                       <Label className="text-xs text-muted-foreground">
-                        Enter the volume of the liquid in liters.
+                        Enter the volume of the liquid in ml.
                       </Label>
                       <FormMessage />
                     </FormItem>
@@ -425,8 +427,8 @@ export default function ProductForm({
             <CardHeader>
               <CardTitle>Ingredients</CardTitle>
               <CardDescription>
-                Tick ingredients in the order they should appear on the label. Allergens are printed in
-                bold.
+                Tick ingredients in the order they should appear on the label. Allergens are printed
+                in bold.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -787,7 +789,8 @@ export default function ProductForm({
                     <div>
                       <CardTitle className="text-xl">Manufacturing Location Details</CardTitle>
                       <CardDescription className="mt-1">
-                        Physical facility and GPS coordinates where this product was produced or bottled.
+                        Physical facility and GPS coordinates where this product was produced or
+                        bottled.
                       </CardDescription>
                     </div>
                   </div>
@@ -962,11 +965,7 @@ export default function ProductForm({
                     <FormItem>
                       <FormLabel>Country</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value || ''}
-                          placeholder="e.g. France"
-                        />
+                        <Input {...field} value={field.value || ''} placeholder="e.g. France" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -980,11 +979,7 @@ export default function ProductForm({
                     <FormItem>
                       <FormLabel>Postal / ZIP Code</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          value={field.value || ''}
-                          placeholder="e.g. 33460"
-                        />
+                        <Input {...field} value={field.value || ''} placeholder="e.g. 33460" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1253,15 +1248,20 @@ export default function ProductForm({
             <CardHeader>
               <CardTitle>Portability &amp; External Links (Optional)</CardTitle>
               <CardDescription>
-                A public DPP QR code is automatically generated for every product without needing any links below.
+                A public DPP QR code is automatically generated for every product without needing
+                any links below.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="p-3.5 bg-verified/10 border border-verified/30 rounded-lg flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-verified flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-foreground leading-relaxed">
-                  <p className="font-semibold text-sm text-foreground mb-0.5">Automatic DPP QR Code</p>
-                  No external link is required! As soon as you save this product, an unauthenticated Digital Product Passport (DPP) QR code and public e-label webpage are generated automatically. The fields below are optional for advanced forwarding.
+                  <p className="font-semibold text-sm text-foreground mb-0.5">
+                    Automatic DPP QR Code
+                  </p>
+                  No external link is required! As soon as you save this product, an unauthenticated
+                  Digital Product Passport (DPP) QR code and public e-label webpage are generated
+                  automatically. The fields below are optional for advanced forwarding.
                 </div>
               </div>
 
@@ -1329,7 +1329,9 @@ export default function ProductForm({
 
                               const data = await response.json().catch(() => ({}));
                               if (!response.ok) {
-                                throw new Error(data.error || `Image upload failed (${response.status})`);
+                                throw new Error(
+                                  data.error || `Image upload failed (${response.status})`,
+                                );
                               }
                               if (typeof data.url !== 'string' || !data.url) {
                                 throw new Error('Image upload returned no image URL.');
@@ -1339,7 +1341,9 @@ export default function ProductForm({
                             } catch (error) {
                               console.error('Upload failed:', error);
                               setImageUploadError(
-                                error instanceof Error ? error.message : 'Image upload failed. Please try again.',
+                                error instanceof Error
+                                  ? error.message
+                                  : 'Image upload failed. Please try again.',
                               );
                             } finally {
                               setIsUploadingImage(false);
