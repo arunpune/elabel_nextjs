@@ -36,13 +36,13 @@ Live site: https://wine-label-management-system.onrender.com
   device's GPS, with an IP-address fallback, an address search and manual entry. All services are
   free and need no API key; see [Location services](#location-services).
 - **QR scan locations (optional):** when a shopper allows it, the location of each QR scan is stored.
-- **Login:** Supabase Auth (password or magic link). Everyone can see all products; only the owner
+- **Login:** Supabase Auth (email and password). Everyone can see all products; only the owner
   can edit or delete one.
 
 ## How to use it: step by step
 
 **1. Log in.** Open the site, click **Log in to the dashboard**, and sign in with your email and
-password, or a magic link sent by email. New users register first.
+password. New users register first and verify their email.
 
 **2. Add your ingredients once.** Go to **Ingredients**, then **New ingredient**. Enter the name,
 category and E-number (e.g. `E220`), and tick any allergens in the *Allergens* box (e.g. Sulphites).

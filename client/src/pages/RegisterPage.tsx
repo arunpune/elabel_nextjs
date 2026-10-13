@@ -15,12 +15,8 @@ import {
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
-
-const magicLinkSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-});
 
 const passwordSchema = z
   .object({
@@ -39,7 +35,6 @@ const passwordSchema = z
     path: ['confirmPassword'],
   });
 
-type MagicLinkFormData = z.infer<typeof magicLinkSchema>;
 type PasswordFormData = z.infer<typeof passwordSchema>;
 
 function getRegistrationErrorMessage(error?: string) {
@@ -52,17 +47,11 @@ function getRegistrationErrorMessage(error?: string) {
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
-  const { loginWithMagicLink, register } = useAuth();
+  const { register } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-
-  const magicLinkForm = useForm<MagicLinkFormData>({
-    resolver: zodResolver(magicLinkSchema),
-    defaultValues: {
-      email: '',
-    },
-  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
@@ -72,34 +61,6 @@ export default function RegisterPage() {
       confirmPassword: '',
     },
   });
-
-  const onMagicLinkSubmit = async (data: MagicLinkFormData) => {
-    setIsLoading(true);
-    try {
-      const result = await loginWithMagicLink(data.email);
-      if (result.success) {
-        setEmailSent(true);
-        toast({
-          title: 'Magic link sent!',
-          description: 'Please check your email to complete your registration.',
-        });
-      } else {
-        toast({
-          title: 'Failed to send magic link',
-          description: getRegistrationErrorMessage(result.error),
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const onPasswordSubmit = async (data: PasswordFormData) => {
     setIsLoading(true);
@@ -148,56 +109,10 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create Account</CardTitle>
-          <CardDescription>Choose how you want to register</CardDescription>
+          <CardDescription>Create an account with your email and password</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="password">
-            {' '}
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger
-                value="password"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Register
-              </TabsTrigger>
-              <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
-            </TabsList>
-            <TabsContent value="magic-link">
-              {emailSent ? (
-                <div className="text-center space-y-4">
-                  <h3 className="text-lg font-medium">Check your email</h3>
-                  <p className="text-muted-foreground">
-                    We've sent you a magic link to complete your registration.
-                  </p>
-                </div>
-              ) : (
-                <Form {...magicLinkForm}>
-                  <form
-                    onSubmit={magicLinkForm.handleSubmit(onMagicLinkSubmit)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={magicLinkForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your email" type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? 'Sending...' : 'Register with Magic Link'}
-                    </Button>
-                  </form>
-                </Form>
-              )}
-            </TabsContent>
-            <TabsContent value="password">
-              <Form {...passwordForm}>
+          <Form {...passwordForm}>
                 <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
                   <FormField
                     control={passwordForm.control}
@@ -218,9 +133,27 @@ export default function RegisterPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter your password" type="password" {...field} />
-                        </FormControl>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              placeholder="Enter your password"
+                              type={showPassword ? 'text' : 'password'}
+                              className="pr-10"
+                              {...field}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            aria-pressed={showPassword}
+                            onClick={() => setShowPassword((visible) => !visible)}
+                          >
+                            {showPassword ? <EyeOff /> : <Eye />}
+                          </Button>
+                        </div>
                         <FormMessage />
                         <p className="text-sm text-muted-foreground">
                           Password must contain at least 8 characters, one uppercase letter, one
@@ -235,9 +168,29 @@ export default function RegisterPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Confirm your password" type="password" {...field} />
-                        </FormControl>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              placeholder="Confirm your password"
+                              type={showConfirmPassword ? 'text' : 'password'}
+                              className="pr-10"
+                              {...field}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                            aria-label={
+                              showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
+                            }
+                            aria-pressed={showConfirmPassword}
+                            onClick={() => setShowConfirmPassword((visible) => !visible)}
+                          >
+                            {showConfirmPassword ? <EyeOff /> : <Eye />}
+                          </Button>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -250,9 +203,7 @@ export default function RegisterPage() {
                     {isLoading ? 'Creating Account...' : 'Create Account'}
                   </Button>
                 </form>
-              </Form>
-            </TabsContent>
-          </Tabs>
+          </Form>
 
           <div className="mt-4 text-center text-sm">
             <p className="text-muted-foreground">
