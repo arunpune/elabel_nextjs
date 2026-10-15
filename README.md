@@ -1,312 +1,439 @@
 # Wine Label Management System (Open E-Label)
 
-A web app for wine producers to publish EU e-labels and Digital Product Passports (DPP). You enter a
-wine once. The app prints a standard back label with a QR code, and the QR opens a public page with
-the ingredients, nutrition and producer details shoppers are entitled to see.
-
-Live site: https://wine-label-management-system.onrender.com
-
-## Contents
-
-1. [Features](#features)
-2. [How to use it: step by step](#how-to-use-it-step-by-step)
-3. [Tech stack](#tech-stack)
-4. [Configuration](#configuration)
-5. [Deploy](#deploy): [Render](#render-the-live-site), [Docker](#docker-any-machine), [Sentry](#sentry-error-monitoring)
-6. [Local development](#local-development)
-7. [Location services](#location-services)
-8. [API](#api)
-9. [Database](#database)
-10. [Excel import and export](#excel-import-and-export)
-11. [Project structure](#project-structure)
-12. [Troubleshooting](#troubleshooting)
-13. [Contributing](#contributing)
+A full-stack web application for wine producers to manage wine inventory, generate EU-compliant Digital Product Passports (DPP), render and print standardized bottle labels with QR codes, and track supply chain traceability.
 
 ## Features
 
-- **Products and ingredients:** create, edit, duplicate and delete. Attach ingredients to a product
-  in label order; allergens are printed in bold. Excel import and export.
-- **Wine label (SVG):** a 100 × 120 mm back label for a standard 750 ml bottle, filled from the
-  product form. Empty fields stay blank. The DPP QR code sits at a fixed spot (25 mm, bottom right).
-  Download the label as SVG, or the QR code as SVG or PNG (1000 × 1000).
-- **Public passport page:** what the QR opens. No login needed, built for phones. Three addresses
-  open the same page: `/qr/product/<id>`, `/dpp/<id>` and `/p/<id>`. If a product has a
-  *Redirect Link*, the page forwards there.
-- **Manufacturing location:** facility, address and GPS coordinates, fetched automatically from the
-  device's GPS, with an IP-address fallback, an address search and manual entry. All services are
-  free and need no API key; see [Location services](#location-services).
-- **QR scan locations (optional):** when a shopper allows it, the location of each QR scan is stored.
-- **Login:** Supabase Auth (email and password). Everyone can see all products; only the owner
-  can edit or delete one.
+- **Product Management**: Create, edit, duplicate, and delete wine products with detailed oenological, nutritional, and logistical data.
+- **EU-Compliant Wine Labels (SVG)**: Generates standard 100 × 120 mm back labels for 750 ml bottles containing legally required particulars, warning pictograms, and embedded QR codes.
+- **Direct Label Printing**: Direct one-click printing of SVG bottle labels at exact physical dimensions (100 × 120 mm) using an invisible browser frame without pop-ups.
+- **Digital Product Passport (DPP)**: Unauthenticated, mobile-optimized public passport webpage (`/qr/product/:id`, `/dpp/:id`, `/p/:id`) displaying full ingredients, allergens, nutrition, and certifications upon scanning.
+- **Permanent QR Code Addresses**: Permanent QR URLs stored in PostgreSQL (`products.qr_url`), preserving origin addresses and ensuring printed physical labels never break.
+- **Ingredient & Allergen Tracking**: Reusable ingredient library with E-numbers, custom label ordering (`ingredient_ids`), and automatic bold styling for allergens in compliance with EU 1169/2011 art. 21.
+- **Intelligent Geolocation**: Automatic facility location capture via HTML5 GPS, fallback IP estimation (`ipwho.is` / `ipapi.co`), OpenStreetMap Nominatim geocoding, and Google Maps integration.
+- **QR Scan Analytics**: Optional shopper scan geolocation capture with in-memory rate limiting and GeoJSON spatial export (`/api/scans.geojson`) for GIS and QGIS mapping.
+- **Excel Bulk Import/Export**: Bulk import and export for both wine products and ingredients via Excel (`.xlsx`) and CSV spreadsheets.
+- **Image Management**: Bottle photo uploads with fallback to local persistent disk volumes (`/uploads`) or Vercel Blob cloud storage.
+- **Authentication & Security**: Supabase Auth (Email & Password) with password visibility toggle, automated session token refreshing, and owner-level record authorization.
+- **Error Monitoring**: Real-time error and exception tracking via Sentry on both frontend (React) and backend (Express/Node.js).
 
-## How to use it: step by step
+## Tech Stack
 
-**1. Log in.** Open the site, click **Log in to the dashboard**, and sign in with your email and
-password. New users register first and verify their email.
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Radix UI / shadcn/ui, Lucide Icons, React Hook Form, Zod, TanStack React Query, Wouter
+- **Backend**: Node.js (v20+), Express.js, Drizzle ORM, postgres.js, Multer
+- **Database**: Supabase PostgreSQL (Session Pooler)
+- **Authentication**: Supabase Auth
+- **Label & QR Generation**: `qrcode`, Standalone SVG generation, Browser Print API
+- **Geolocation**: HTML5 Geolocation API, OpenStreetMap Nominatim, IPWho.is / IPAPI
+- **File & Spreadsheet Processing**: Multer, XLSX
+- **Monitoring**: Sentry (`@sentry/react`, `@sentry/node`)
+- **Containerization & Hosting**: Docker, Docker Compose, Render
 
-**2. Add your ingredients once.** Go to **Ingredients**, then **New ingredient**. Enter the name,
-category and E-number (e.g. `E220`), and tick any allergens in the *Allergens* box (e.g. Sulphites).
-Ingredients can be reused across all your products. To add a list, use **Import** with an Excel or
-CSV file.
+## Local Setup
 
-**3. Create a product.** Go to **Products**, then **New product**, and fill in the form:
-- *Product information* and *Wine details*: name, brand, volume, vintage, type, sugar, alcohol.
-- *Ingredients*: tick them **in the order they should appear on the label**. The numbers show the
-  order. Allergens print in bold.
-- *Nutrition*, *Responsible consumption* (warning pictograms) and *Certifications*.
-- *Manufacturing location*: filled in automatically when the form opens (see step 4).
-- *Food business operator*, *Logistics* (country, SKU, EAN), and the product image (in
-  *Portability & External Links*).
+### Prerequisites
 
-Click **Create product**. Fields you leave empty stay blank on the label.
+- Node.js (v20 or higher) and npm
+- Docker and Docker Desktop (optional, for containerized execution)
+- Supabase account (for PostgreSQL database and authentication)
+- Sentry account (optional, for exception monitoring)
 
-**4. Check the manufacturing location.**
-- When you open the form, the browser asks for your location. Click **Allow** to use the device's GPS.
-- If GPS is off or you say no, the app estimates the location from your internet connection (IP address).
-- To use another place, type an address or estate name and click **Find coordinates**, or type
-  the details in yourself. Click **Auto-fetch location** to try again.
-- **Preview on map** opens the coordinates in Google Maps.
+### Installation
 
-**5. Get the label and QR code.** Open the product. The **Bottle label** panel shows the 100 × 120 mm label.
-- **Download label (SVG)** for printing; the label is true to size.
-- **QR (SVG)** or **QR (PNG)** for the QR code alone. PNG files are 1000 × 1000 px.
-- **Open public passport** to see what shoppers see. On the Products list, the **⋮** menu also has
-  **Public passport** and **Download QR code (PNG)**.
+1. **Clone the repository**
 
-**6. Print and check.** Print the label at 100 % scale, without "fit to page". Scan the QR with a phone:
-it must open `https://wine-label-management-system.onrender.com/qr/product/<id>` and show the wine.
+   ```bash
+   git clone <repository-url>
+   cd elabel_nextjs
+   ```
 
-**7. Edit later.** Open the product and click **Edit**. Changes show on the passport straight away.
-A printed QR code never needs reprinting, because it always points to the same page.
+2. **Install dependencies**
 
-## Tech stack
+   ```bash
+   npm install
+   ```
 
-React, TypeScript, Vite, Tailwind CSS and shadcn/ui on the frontend; Express on the server; Supabase
-(PostgreSQL + Auth) with Drizzle ORM; `qrcode` for QR codes; Multer for uploads; XLSX for Excel.
+3. **Environment Configuration**
 
-## Configuration
+   Copy `.env.example` to `.env`:
 
-Copy `.env.example` to `.env` (PowerShell: `Copy-Item .env.example .env`) and fill it in. The file
-explains every variable. The ones that matter most:
+   ```bash
+   cp .env.example .env
+   ```
 
-| Variable | What to put |
-|---|---|
-| `DATABASE_URL` | The **Session pooler** string from Supabase → *Connect* → *Session pooler*. The direct `db.<ref>.supabase.co` host is IPv6-only, and Docker cannot reach it. |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` and the matching `VITE_*` values | From Supabase → *Project Settings* → *API*. `VITE_*` values are built into the browser bundle, so rebuild after changing them. |
-| `BASE_URL` | The public address of the site, e.g. `https://wine-label-management-system.onrender.com`. |
-| `SCANS_EXPORT_KEY` | Optional. Any secret string. It turns on the scan-location export (`/api/scans.geojson`). Leave it empty to keep the export off. |
+   Update `.env` with your project credentials:
 
-**Permanent QR Codes Stored in Database.** When a product is created, its QR code / Digital Product Passport URL is permanently generated using the base URL/origin through which it was created (e.g. `https://wine-label-management-system.onrender.com` on Render, or `http://localhost:5000` locally/Docker) and stored in `products.qr_url` in PostgreSQL. It never changes even if the dashboard is accessed from a different host, ensuring physical bottle labels and digital passports stay 100% immutable and compliant with EU wine regulations.
+   ```env
+   # Database (Supabase Session Pooler - IPv4 compatible)
+   DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
 
-**Database changes apply themselves.** On start, the server runs the re-runnable SQL files in
-`server/db/` (`server/migrate.ts`); the log shows `Database schema is up to date`. Only
-`server/db/profiles.sql` is a one-time manual step, run in the Supabase SQL editor if it was never run.
+   # Backend Authentication & Security
+   JWT_SECRET=your-secure-jwt-secret-key
+   EMAIL_USER=your-email@example.com
+   EMAIL_PASS=your-email-app-password
 
-## Deploy
+   # Public Base URL (QR codes and DPP links resolve to this host)
+   BASE_URL=http://localhost:5000
 
-### Render (the live site)
+   # Supabase Configuration
+   SUPABASE_URL=https://<project-ref>.supabase.co
+   SUPABASE_ANON_KEY=your_supabase_public_anon_key
+   SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 
-**First-time setup** (already done for the live site; for a new service):
-1. Render → *New* → *Web Service* → connect `om-bagade2007/elabel_nextjs`, branch `main`.
-2. Runtime: **Node**. Build command: `npm install --include=dev && npm run build`
-   (`--include=dev` keeps the build tools even when `NODE_ENV=production` is set). Start command: `npm start`.
-   Health check path: `/api/health`.
-3. Under *Environment*, add the variables from `.env.example`:
-   - `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-   - `BASE_URL=https://wine-label-management-system.onrender.com`
-   - Optional: `SCANS_EXPORT_KEY`, and the Sentry values (see below).
+   # Frontend Build Variables (baked in at build time)
+   VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_supabase_public_anon_key
 
-**Every update:**
-1. Merge or push your change into `main` on GitHub.
-2. Render → the service → **Manual Deploy** → *Deploy latest commit*. It does not deploy on its own.
-3. In *Logs*, wait for `Database schema is up to date` and `Server is running`.
-4. Check it after every deploy:
-   - [ ] `https://wine-label-management-system.onrender.com/api/health` returns `{"status":"ok"}`.
-   - [ ] Log in, then create a test product. It saves without an error.
-   - [ ] On the product page, the link under the label starts with the Render address, not `localhost`.
-   - [ ] Scan the label's QR with a phone. The passport page opens.
-   - [ ] Delete the test product.
+   # Runtime Settings
+   NODE_ENV=development
+   PORT=5000
+   HOST=0.0.0.0
 
-If you change any `VITE_*` value, deploy again: those values are built into the page.
+   # Error Monitoring (Optional)
+   VITE_SENTRY_DSN=https://your-public-key@your-org.ingest.sentry.io/project-id
+   SENTRY_AUTH_TOKEN=your_sentry_auth_token
 
-### Docker (any machine)
-1. Install Docker Desktop and start it.
-2. `git clone` the repo, then `cp .env.example .env` and fill it in (see Configuration). Set
-   `BASE_URL` to the address phones will use, e.g. `http://192.168.1.20:5000` or your domain.
-3. Build and start:
+   # Storage & Analytics (Optional)
+   BLOB_READ_WRITE_TOKEN=
+   SCANS_EXPORT_KEY=your-secret-scans-export-key
+   ```
+
+   > [!IMPORTANT]
+   > For `DATABASE_URL`, always use the **Session Pooler** connection string (`pooler.supabase.com:5432`). Direct Supabase hostnames (`db.<ref>.supabase.co`) resolve exclusively to IPv6 addresses, which fail inside Docker and non-IPv6 local networks.
+
+4. **Database Migration**
+
+   The server automatically checks and applies database migrations from `server/db/*.sql` on launch (`server/migrate.ts`). To manually push schema changes via Drizzle:
+
+   ```bash
+   npm run db:push
+   ```
+
+5. **Start the Development Server**
+
+   ```bash
+   npm run dev
+   ```
+
+   The application will be available at `http://localhost:5000`.
+
+### Docker Setup
+
+To run the full stack inside an isolated, production-grade Docker container:
+
+1. Ensure `.env` is configured (including `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`).
+2. Build and launch the container in detached mode:
+
    ```bash
    docker compose up -d --build
-   curl http://localhost:5000/api/health   # {"status":"ok"}
    ```
-4. Logs: `docker compose logs -f app`. Stop: `docker compose down`.
-5. To update: `git pull`, then `docker compose up -d --build` again.
 
-The image runs as a non-root user. Uploaded images live in the `uploads` volume and survive
-updates. Never commit `.env`.
+3. Check container health:
 
-### Sentry (error monitoring)
-1. Create a free account at https://sentry.io. Create a **React** project, and copy its **DSN**
-   (*Project Settings → Client Keys (DSN)*).
-2. Set `VITE_SENTRY_DSN=<that DSN>` in Render's *Environment*, or in `.env` for Docker. Deploy or
-   rebuild: the DSN is built into the page, so it only takes effect after a new build.
-3. Optional, readable stack traces: create an auth token (*Settings → Auth Tokens*, scope
-   `project:releases`), and set `SENTRY_AUTH_TOKEN` in Render. Source maps then upload during
-   the build. The Sentry org and project names are set in `vite.config.ts` (`canspirit-ai` /
-   `elabel`); change them there if you use your own Sentry account. The Docker build does not
-   pass this token, so source-map upload only runs on Render.
-4. Check it. **This needs a second person; don't tick it off on your own.**
-   - [ ] Render *Environment* has `VITE_SENTRY_DSN`, and a deploy ran after it was added.
-   - [ ] Open the live site, open the browser console (F12), and run
-     `setTimeout(() => { throw new Error('Sentry test') })`.
-   - [ ] Within a minute, Sentry → *Issues* shows "Sentry test" with the site's address.
-   - [ ] If `SENTRY_AUTH_TOKEN` is set: the issue's stack trace shows real file names
-     (e.g. `PublicProductPage.tsx`), not only `index-….js`.
+   ```bash
+   curl http://localhost:5000/api/health
+   # {"status":"ok"}
+   ```
 
-Both the browser (via `VITE_SENTRY_DSN`) and backend Express server (via `SENTRY_DSN`) report
-unhandled errors and exceptions to Sentry in development and production (`server/production.ts`).
+4. View logs or stop the service:
 
-## Local development
+   ```bash
+   docker compose logs -f app
+   docker compose down
+   ```
 
-Requires Node.js 20+ and npm.
+## Development Commands
 
-```bash
-npm install
-cp .env.example .env    # then fill it in, see Configuration
-npm run dev             # http://localhost:5000
+- `npm run dev` - Start development server with Vite hot-reload on port 5000
+- `npm run build` - Build the React client with Vite and bundle Express with esbuild
+- `npm start` - Run the production server from `dist/index.js`
+- `npm run check` - Run TypeScript compiler (`tsc`) type checking
+- `npm run db:push` - Push `shared/schema.ts` schema changes directly to Supabase
+- `npm run lint` - Run ESLint code quality checks
+- `npm run format` - Format codebase with Prettier
+- `npm run check:storage` - Verify database storage operations against test database
+- `npm run check:migrate` - Validate startup migration SQL files against test database
+
+## Project Structure
+
+```
+elabel_nextjs/
+├── client/                         # Frontend React SPA
+│   ├── src/
+│   │   ├── components/             # Reusable UI components
+│   │   │   ├── forms/              # ProductForm, IngredientForm, IngredientPicker
+│   │   │   ├── label/              # WineLabel SVG renderer, QR generator, print logic
+│   │   │   ├── layout/             # Navigation, ProtectedRoute, Page layout
+│   │   │   ├── modals/             # ProductPreviewModal, DeleteConfirmationModal
+│   │   │   ├── tables/             # ProductsTable, IngredientsTable
+│   │   │   └── ui/                 # Base shadcn / Radix UI primitives
+│   │   ├── hooks/                  # Custom React hooks (use-toast, etc.)
+│   │   ├── lib/                    # Supabase client, API client, geolocation helpers
+│   │   ├── pages/                  # Route views (Products, Detail, Ingredients, Passport, Auth)
+│   │   ├── types/                  # TypeScript interface definitions
+│   │   ├── App.tsx                 # Wouter route definitions and layout shell
+│   │   ├── index.css               # Design system tokens and Tailwind layers
+│   │   └── main.tsx                # Client bootstrap with React Query and Sentry
+│   └── index.html                  # HTML entry point
+├── server/                         # Backend Express application
+│   ├── db/                         # SQL migration files
+│   ├── auth.ts                     # User identity helpers and session validation
+│   ├── db.ts                       # PostgreSQL connection pooling setup
+│   ├── index.ts                    # Development server bootstrap with Vite HMR
+│   ├── migrate.ts                  # Automatic startup SQL migration runner
+│   ├── production.ts               # Production HTTP server with Sentry error logging
+│   ├── routes.ts                   # REST API routes and business logic
+│   ├── storage.ts                  # Drizzle ORM data persistence layer
+│   └── vite.ts                     # Development Vite middleware integration
+├── shared/                         # Shared full-stack definitions
+│   ├── publicUrl.ts                # QR URL resolution and base address helpers
+│   ├── schema.ts                   # Drizzle schema definitions and Zod validation
+│   └── supabase.ts                 # Shared Supabase connection config
+├── scripts/                        # Development and validation scripts
+│   ├── dev.mjs                     # Development server runner
+│   ├── check-migrate.ts            # Migration integrity verification
+│   └── check-storage.ts            # Data access layer smoke test
+├── uploads/                        # Persistent local directory for uploaded bottle images
+├── Dockerfile                      # Multi-stage optimized production Docker image
+├── docker-compose.yml              # Docker Compose service definition
+├── drizzle.config.ts               # Drizzle ORM configuration
+├── tailwind.config.ts              # Tailwind CSS theme configuration
+└── vite.config.ts                  # Vite build and plugin configuration
 ```
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Development server with hot reload |
-| `npm run build` / `npm start` | Production build and start |
-| `npm run check` | TypeScript type check |
-| `npm run lint` / `npm run format` | ESLint / Prettier |
-| `npm run db:push` | Push `shared/schema.ts` to a database (not needed for normal use) |
-| `npm run check:storage` | Ingredient and scan storage check. **Run against a test database only.** |
-| `npm run check:migrate` | Startup-migration check against an old-schema database. **Test database only.** |
+## API Endpoints
 
-There is no `npm test` suite yet. `npm test` only prints a message.
+### System & Configuration
 
-## Location services
+- `GET /api/health` - Service health status check
+- `GET /api/config` - Public frontend configuration (`supabaseUrl`, `supabaseAnonKey`, `publicUrl`)
 
-All of these are free and need no API key:
+### Public & Digital Product Passport (DPP)
 
-| Function | Service | Where it runs |
+- `GET /api/public/products/:id` - Fetch public product passport with ordered ingredients (unauthenticated)
+- `POST /api/public/scans` - Log an unauthenticated shopper QR scan location (`{productId, lat, lng, source}`)
+- `GET /api/scans.geojson` - Export scan coordinates as GeoJSON (requires `SCANS_EXPORT_KEY` query param)
+
+### Geolocation & Traceability
+
+- `GET /api/geolocation/detect` - Server-side IP geolocation detection
+- `GET /api/geolocation/reverse?lat=&lon=` - Reverse geocode GPS coordinates to street address
+- `GET /api/geolocation/search?q=` - Search coordinates from text address via Nominatim
+
+### Products (🔒 Requires Authentication)
+
+- `GET /api/products` - List all products with user edit permissions
+- `GET /api/products/:id` - Get single product details and ingredients
+- `POST /api/products` - Create new wine product (generates permanent QR URL)
+- `PUT /api/products/:id` - Update existing product (owner only)
+- `DELETE /api/products/:id` - Delete product and clean up attached image (owner only)
+- `POST /api/products/:id/image` - Upload and link product bottle image
+- `DELETE /api/products/:id/image` - Delete product image from storage
+- `POST /api/get-url` - Direct upload handler for product imagery
+- `GET /api/products/export` - Export all products to Excel spreadsheet
+- `POST /api/products/import` - Bulk import products from Excel (`.xlsx`) or CSV
+
+### Ingredients (🔒 Requires Authentication)
+
+- `GET /api/ingredients` - List all user ingredients
+- `GET /api/ingredients/:id` - Get single ingredient details
+- `POST /api/ingredients` - Create new ingredient with allergen tags
+- `PUT /api/ingredients/:id` - Update ingredient details
+- `DELETE /api/ingredients/:id` - Delete ingredient
+- `GET /api/ingredients/export` - Export ingredients to Excel spreadsheet
+- `POST /api/ingredients/import` - Bulk import ingredients from Excel (`.xlsx`) or CSV
+
+## Database Schema
+
+### Products Table (`products`)
+
+- `id` - Primary key (serial integer)
+- `name` - Wine / product commercial name (text, required)
+- `brand` - Producer brand or label line (text)
+- `netVolume` - Net bottle volume, e.g. "750 ml" (text)
+- `vintage` - Harvest year, e.g. "2021" (text)
+- `wineType` - Category, e.g. "Dry Red Wine", "Sparkling" (text)
+- `sugarContent` - Sugar profile, e.g. "Dry", "Brut", "Demi-Sec" (text)
+- `appellation` - Protected geographical indication / region (text)
+- `alcoholContent` - Alcohol by volume percentage, e.g. "13.5%" (text)
+- `packagingGases` - Preservative gases, e.g. "bottled", "may_happen" (text)
+- `portionSize` - Reference serving size, e.g. "100 ml" (text)
+- `kcal` - Energy in kilocalories per 100 ml (text)
+- `kj` - Energy in kilojoules per 100 ml (text)
+- `fat` - Total fat in grams per 100 ml (text)
+- `saturates` - Saturated fatty acids in grams per 100 ml (text)
+- `carbohydrates` - Carbohydrates in grams per 100 ml (text)
+- `sugar` - Sugars in grams per 100 ml (text)
+- `protein` - Protein in grams per 100 ml (text)
+- `salt` - Salt in grams per 100 ml (text)
+- `pregnancyWarning` - Health warning: not for pregnant women (boolean)
+- `ageWarning` - Legal drinking age restriction warning (boolean)
+- `drivingWarning` - Health warning: do not drink and drive (boolean)
+- `organic` - Organic wine certification status (boolean)
+- `vegetarian` - Vegetarian certification status (boolean)
+- `vegan` - Vegan certification status (boolean)
+- `operatorType` - Business role: Bottler, Producer, Packager, Importer, Vendor (text)
+- `operatorName` - Legal company / producer name (text)
+- `operatorAddress` - Registered facility address (text)
+- `operatorInfo` - Supplementary operator details (text)
+- `countryOfOrigin` - Country where the wine was produced (text)
+- `manufacturingLocation` - Facility / vineyard name (text)
+- `manufacturingAddress` - Facility physical street address (text)
+- `manufacturingCity` - Facility municipality / city (text)
+- `manufacturingState` - Facility state, province, or region (text)
+- `manufacturingCountry` - Facility country (text)
+- `manufacturingPostalCode` - Facility ZIP / postal code (text)
+- `manufacturingLatitude` / `latitude` - GPS latitude coordinate (text)
+- `manufacturingLongitude` / `longitude` - GPS longitude coordinate (text)
+- `sku` - Stock Keeping Unit code (text)
+- `ean` - European Article Number barcode string (text)
+- `externalLink` - External winery or marketing website (text)
+- `redirectLink` - Forwarding URL overriding default public passport (text)
+- `imageUrl` - Filepath or URL of uploaded bottle photograph (text)
+- `qrUrl` - Permanent generated Digital Product Passport QR address (text)
+- `ingredientIds` - Array of ingredient IDs in the exact order shown on the label (integer[])
+- `createdAt` - Record creation timestamp (timestamp)
+- `updatedAt` - Record last modification timestamp (timestamp)
+- `createdBy` - Legacy integer user ID reference (integer)
+- `ownerId` - Supabase authentication user UUID (uuid)
+
+### Ingredients Table (`ingredients`)
+
+- `id` - Primary key (serial integer)
+- `name` - Ingredient designation, e.g. "Grapes", "Sulphites" (text, required)
+- `category` - Functional class, e.g. "Base", "Preservative", "Acidity regulator" (text)
+- `eNumber` - European additive identifier code, e.g. "E220" (text)
+- `allergens` - Recognized allergen classifications (text[])
+- `details` - Additional technical notes or processing information (text)
+- `createdAt` - Record creation timestamp (timestamp)
+- `updatedAt` - Record last modification timestamp (timestamp)
+- `createdBy` - Legacy integer user ID reference (integer)
+- `ownerId` - Supabase authentication user UUID (uuid)
+
+### Scans Table (`scans`)
+
+- `id` - Primary key (serial integer)
+- `productId` - Foreign key linking to scanned product (integer)
+- `lat` - Shopper latitude coordinate (double precision)
+- `lng` - Shopper longitude coordinate (double precision)
+- `source` - Client device or scanner source identifier (text)
+- `createdAt` - Timestamp when the QR scan was recorded (timestamp)
+
+### Users Table (`users`)
+
+- `id` - Primary key (serial integer)
+- `username` - Unique user handle (varchar)
+- `email` - Unique email address (varchar)
+- `password` - Hashed password string (varchar)
+- `isEmailConfirmed` - Email verification status (boolean)
+- `emailConfirmationToken` - Email verification token (varchar)
+- `emailConfirmationTokenExpiry` - Token expiration timestamp (timestamp)
+- `createdAt` - Account registration timestamp (timestamp)
+
+## Import/Export Format
+
+### Products Excel Format
+
+When importing products via Excel (`.xlsx`) or CSV, the parser maps the following columns:
+
+| Column Header | Accepted Aliases | Description | Example |
+|---|---|---|---|
+| `Name` | `Product Name` | Product title (Required) | Chateau Lumière Reserve |
+| `Net Volume` | `Volume` | Bottle volume | 750 ml |
+| `Vintage` | `Year` | Harvest year | 2021 |
+| `Wine Type` | `Type`, `Wine Category` | Beverage classification | Dry Red Wine |
+| `Sugar Content` | `Sugar` | Residual sugar category | Dry |
+| `Appellation` | `Region` | Protected origin / appellation | Bordeaux AOP |
+| `SKU` | `Product Code` | Internal stock keeping unit | CLR-2021-01 |
+
+Exported product files contain the full set of particulars including Name, Volume, Vintage, Wine Type, Sugar Content, Appellation, SKU, and all manufacturing location address and GPS coordinates.
+
+### Ingredients Excel Format
+
+When importing ingredients via Excel (`.xlsx`) or CSV, the spreadsheet must include:
+
+| Column Header | Description | Example |
 |---|---|---|
-| Live GPS coordinates | HTML5 Geolocation API (the device's own GPS) | Browser |
-| Address from coordinates | OpenStreetMap Nominatim (`nominatim.openstreetmap.org`) | Browser, plus server `/api/geolocation/reverse` |
-| IP fallback | `ipwho.is`, then `ipapi.co` | Server `/api/geolocation/detect`, then browser |
-| Coordinates from an address | OpenStreetMap Nominatim | Browser, plus server `/api/geolocation/search` |
-| Map view | Google Maps link (`google.com/maps?q=lat,lng`) | Product form, product page, public page |
+| `Name` | Ingredient chemical or common name (Required) | Potassium metabisulphite |
+| `Category` | Additive or processing classification | Preservatives |
+| `E Number` | European food additive code | E224 |
+| `Allergens` | Comma-separated allergen triggers | Sulphites |
+| `Details` | Supplementary specifications | Antioxidant agent |
 
-The order is: GPS, then the IP lookup, then manual entry. Code: `client/src/lib/geolocation.ts`
-and `server/routes.ts`. IP lookups give a city-level estimate, not the exact building, so check
-the result. Nominatim allows about one request per second; that is plenty for a product form.
+## Deployment
 
-**QR scan locations (optional).** When a shopper opens the passport from a QR code, the page asks
-for their location; they can say no. Allowed locations are stored in the `scans` table. Other tools
-can post scans too, up to 60 per minute per IP:
+### Render (Live Deployment)
+
+The live application is hosted on Render as a Node Web Service connected to GitHub repository `om-bagade2007/elabel_nextjs`.
+
+1. **Service Configuration**:
+   - **Environment**: Node
+   - **Build Command**: `npm install --include=dev && npm run build`
+   - **Start Command**: `npm start`
+   - **Health Check Path**: `/api/health`
+2. **Environment Variables**:
+   - Add `DATABASE_URL` (Supabase Session Pooler string).
+   - Add `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`.
+   - Add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+   - Set `BASE_URL=https://wine-label-management-system.onrender.com`.
+   - Optional: `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SCANS_EXPORT_KEY`.
+3. **Database Migrations**:
+   - Handled automatically on startup by `server/migrate.ts`.
+
+### Docker (Self-Hosted)
+
+The application includes a production-ready multi-stage `Dockerfile` and `docker-compose.yml`:
+
 ```bash
-curl -X POST $BASE_URL/api/public/scans -H 'Content-Type: application/json' \
-  -d '{"productId": 1, "lat": 18.5204, "lng": 73.8567, "source": "my-tool"}'
-```
-With `SCANS_EXPORT_KEY` set, `GET $BASE_URL/api/scans.geojson?key=<key>` returns all scans as
-GeoJSON, which any map tool can open.
+# 1. Prepare environment variables
+cp .env.example .env
 
-## API
+# 2. Build and run container
+docker compose up -d --build
 
-Endpoints marked 🔒 need a Supabase access token (`Authorization: Bearer <token>`); the app sends it
-automatically.
-
-| Method and path | Purpose |
-|---|---|
-| `GET /api/health` | Health check |
-| `GET /api/config` | Public settings for the browser (Supabase URL/anon key, public URL) |
-| `GET /api/public/products/:id` | Product with its ingredients, for the passport page |
-| `POST /api/public/scans` | Record a QR scan `{productId, lat, lng, source?}` |
-| `GET /api/scans.geojson?key=…` | All scans as GeoJSON (needs `SCANS_EXPORT_KEY`) |
-| `GET /api/geolocation/detect`, `/reverse?lat=&lon=`, `/search?q=` | Location helpers for the product form |
-| 🔒 `GET/POST /api/products`, `GET/PUT/DELETE /api/products/:id` | Products |
-| 🔒 `POST/DELETE /api/products/:id/image`, `POST /api/get-url` | Product images |
-| 🔒 `GET /api/products/export`, `POST /api/products/import` | Excel export and import |
-| 🔒 `GET/POST /api/ingredients`, `GET/PUT/DELETE /api/ingredients/:id` | Ingredients |
-| 🔒 `GET /api/ingredients/export`, `POST /api/ingredients/import` | Excel export and import |
-
-Login, registration and password reset go straight to Supabase Auth from the browser; there are no
-`/api/auth` endpoints.
-
-## Database
-
-Tables are defined in `shared/schema.ts`.
-
-- **products:**
-  - identity: name, brand, net volume, vintage, wine type, sugar content, appellation, alcohol
-  - nutrition per 100 ml: kcal, kJ, fat, saturates, carbohydrates, sugar, protein, salt, portion size
-  - warnings (pregnancy, under 18, driving) and certifications (organic, vegetarian, vegan)
-  - packaging gases
-  - operator: type, name, address, info
-  - country of origin, SKU, EAN
-  - manufacturing: location, address, city, state, country, postal code, latitude, longitude
-  - external link, redirect link, image URL
-  - `ingredient_ids` (label order), owner, timestamps
-- **ingredients:** name, category, E-number, allergens, details, owner, timestamps.
-- **scans:** product, latitude, longitude, source, time.
-- **users:** an older table from before Supabase Auth; logins now use Supabase.
-
-## Excel import and export
-
-**Products import** reads these columns; the names in brackets also work:
-`Name` (Product Name), `Net Volume` (Volume), `Vintage` (Year), `Wine Type` (Type, Wine Category),
-`Sugar Content` (Sugar), `Appellation` (Region), `SKU` (Product Code). Other product fields are edited
-in the app.
-
-**Products export** writes Name, Net Volume, Vintage, Type, Sugar Content, Appellation, SKU and the
-manufacturing location with its coordinates.
-
-**Ingredients** import and export use `Name`, `Category`, `E Number`, `Allergens` (comma-separated)
-and `Details`.
-
-## Project structure
-
-```
-client/src/
-  components/label/   WineLabel: label SVG, QR code, downloads
-  components/forms/   Product and ingredient forms, ingredient picker
-  components/         layout, tables, modals, ui (shadcn)
-  pages/              Dashboard pages and the public passport page
-  lib/                Auth, API client, geolocation helpers
-server/
-  routes.ts           API endpoints
-  storage.ts          Database queries (Drizzle)
-  migrate.ts          Applies server/db/*.sql on start
-  production.ts       Production server; index.ts is the dev server
-  db/                 SQL migrations
-shared/schema.ts      Database tables and validation
-scripts/              Dev runner and check scripts
-docs/                 Screenshots and status report
-Dockerfile, docker-compose.yml
+# 3. View running container logs
+docker compose logs -f app
 ```
 
-Further reading: `implementation.md` (how the latest version was built) and `result.md` (what
-was fixed and what is left).
+- Multi-stage build compiles Vite and esbuild assets before pruning development dependencies.
+- Runs securely under the unprivileged `node` user.
+- Local uploads persist across container restarts via the `uploads` Docker volume.
+- Integrated container health check queries `/api/health` every 30 seconds.
+
+### Sentry (Error Monitoring)
+
+The project includes Sentry integration for real-time error tracking across both the frontend React client and backend Express server.
+
+1. **Obtain Sentry DSN**:
+   - Create a project on [sentry.io](https://sentry.io) and copy the **DSN** from *Project Settings → Client Keys (DSN)*.
+2. **Configure Environment Variables**:
+   - Set `VITE_SENTRY_DSN=<your-dsn>` in `.env` (or under Render's *Environment* / Docker build args).
+   - *(Optional for readable stack traces)*: Create an auth token in Sentry (*User Settings → Auth Tokens* with scope `project:releases`) and set `SENTRY_AUTH_TOKEN=<your-token>`.
+3. **Verify Error Tracking**:
+   - Open the web application and run the following in your browser's developer console (F12):
+     ```javascript
+     setTimeout(() => { throw new Error('Sentry test event'); });
+     ```
+   - Verify that the error appears within a minute under **Issues** in your Sentry dashboard.
 
 ## Troubleshooting
 
-| Problem | Cause and fix |
-|---|---|
-| "Failed to create product" | The database is missing columns. Redeploy: they are added on start. Check the log for `Database schema is up to date`. |
-| QR opens `localhost` | The QR was downloaded from an old version. Redeploy, download it again and reprint. Set `BASE_URL` to the public address. |
-| Docker: `getaddrinfo ENOTFOUND db.….supabase.co` | `DATABASE_URL` uses the IPv6-only direct host. Use the Session pooler string. |
-| Blank page after a Docker build | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` were empty at build time. Fill `.env` and rebuild. |
-| Location stays empty | The browser blocked location, and the IP services were unreachable. Use **Find coordinates**, or type the address. |
-| Render build fails on `vite` or `esbuild` | Use the build command `npm install --include=dev && npm run build`. |
+| Problem | Root Cause | Solution |
+|---|---|---|
+| `getaddrinfo ENOTFOUND db.<ref>.supabase.co` | Direct Supabase database hostnames resolve exclusively via IPv6, which is unsupported by Docker networks. | In `.env`, use the Supabase **Session Pooler** connection string (`aws-0-<region>.pooler.supabase.com:5432`). |
+| Blank white screen on Docker or Render | `VITE_*` environment variables were not present during the Vite frontend build step. | Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` before running `npm run build` or pass them as Docker build args. |
+| Button or input styling looks disabled | Overridden background utility classes (e.g. `bg-accent`) causing text and button backgrounds to blend. | Use standard `<Button>` variants without conflicting background utility overrides. |
+| Geolocation coordinates stay empty | Browser location permission was denied or ignored by user. | The system automatically falls back to IP address estimation. Alternatively, use the **Find coordinates** address search button or enter coordinates manually. |
+| Render build fails with missing dev modules | Production build commands without devDependencies cannot run Vite or esbuild. | Ensure Render build command is set to `npm install --include=dev && npm run build`. |
 
 ## Contributing
 
-Create a branch, make your change, run `npm run check`, and open a pull request into `main`.
-Pull before you push; several people work on `main`.
+1. Fork the repository
+2. Create a descriptive feature branch (`git checkout -b feat/your-feature-name`)
+3. Commit your changes (`git commit -m "feat: add feature description"`)
+4. Verify TypeScript and code quality (`npm run check`)
+5. Push to your branch and submit a Pull Request into `main`
 
 ## License
 
-MIT
+This project is licensed under the MIT License.
