@@ -4,11 +4,26 @@ import { supabase } from './supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Profile, ProfileUpdate } from '@/types/profile';
 
+async function getAuthRedirectUrl(path: string) {
+  let baseUrl = window.location.origin;
+  try {
+    const response = await fetch('/api/config');
+    if (response.ok) {
+      const config = await response.json();
+      if (typeof config.publicUrl === 'string' && config.publicUrl.trim()) {
+        baseUrl = config.publicUrl.trim();
+      }
+    }
+  } catch {
+    // Keep the current app origin if runtime configuration cannot be reached.
+  }
+  return new URL(path, `${baseUrl.replace(/\/$/, '')}/`).toString();
+}
+
 interface AuthState {
   user: User | null;
   profile: Profile | null;
   isAuthenticated: boolean;
-  loginWithMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   loginWithPassword: (
     email: string,
     password: string,
@@ -28,27 +43,6 @@ export const useAuth = create<AuthState>()(
       user: null,
       profile: null,
       isAuthenticated: false,
-      loginWithMagicLink: async (email: string) => {
-        try {
-          console.log('Attempting magic link login for:', email);
-          const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback`,
-            },
-          });
-
-          if (error) {
-            console.error('Magic link login error:', error);
-            return { success: false, error: error.message };
-          }
-
-          return { success: true };
-        } catch (error: any) {
-          console.error('Magic link login error:', error);
-          return { success: false, error: error.message || 'Login failed' };
-        }
-      },
       loginWithPassword: async (email: string, password: string) => {
         try {
           console.log('Attempting password login for:', email);
@@ -92,13 +86,14 @@ export const useAuth = create<AuthState>()(
       register: async (email: string, password: string) => {
         try {
           console.log('Starting registration process for:', email);
+          const emailRedirectTo = await getAuthRedirectUrl('/auth/callback');
 
           // Attempt to sign up the user
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              emailRedirectTo,
               data: {
                 email_confirm: true,
               },
@@ -150,10 +145,10 @@ export const useAuth = create<AuthState>()(
             .from('profiles')
             .select('*')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           if (error) {
-            console.error('Error fetching profile:', error);
+            console.warn('Profile not found or table not initialized:', error.message || error);
             return;
           }
 
@@ -194,8 +189,9 @@ export const useAuth = create<AuthState>()(
       resetPassword: async (email: string) => {
         try {
           console.log('Attempting password reset for:', email);
+          const redirectTo = await getAuthRedirectUrl('/auth/callback?reset=true');
           const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/auth/callback?reset=true`,
+            redirectTo,
           });
 
           if (error) {
@@ -266,3 +262,12 @@ export const useAuth = create<AuthState>()(
     },
   ),
 );
+
+// Keep the UI's persisted auth flag in sync with Supabase's actual session.
+supabase.auth.onAuthStateChange((_event, session) => {
+  useAuth.setState((state) => ({
+    user: session?.user ?? null,
+    isAuthenticated: !!session?.user,
+    profile: session?.user?.id === state.user?.id ? state.profile : null,
+  }));
+});

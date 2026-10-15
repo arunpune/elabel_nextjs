@@ -1,16 +1,19 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import {
   users,
   products,
   ingredients,
+  scans,
   type User,
   type InsertUser,
   type Product,
   type InsertProduct,
   type Ingredient,
   type InsertIngredient,
+  type LabelIngredient,
+  type Scan,
 } from '@shared/schema';
 
 const connectionString = process.env.DATABASE_URL!;
@@ -27,20 +30,22 @@ export interface IStorage {
 
   // Product methods
   getProducts(): Promise<Product[]>;
-  getProduct(id: number): Promise<Product | undefined>;
-  createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
-  deleteProduct(id: number): Promise<boolean>;
+  getProduct(id: number, ownerId: string): Promise<Product | undefined>;
+  getPublicProduct(id: number): Promise<Product | undefined>;
+  createProduct(product: InsertProduct, baseUrl?: string): Promise<Product>;
+  updateProduct(id: number, ownerId: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: number, ownerId: string): Promise<boolean>;
 
   // Ingredient methods
-  getIngredients(): Promise<Ingredient[]>;
-  getIngredient(id: number): Promise<Ingredient | undefined>;
+  getIngredients(ownerId: string): Promise<Ingredient[]>;
+  getIngredient(id: number, ownerId: string): Promise<Ingredient | undefined>;
   createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
   updateIngredient(
     id: number,
+    ownerId: string,
     ingredient: Partial<InsertIngredient>,
   ): Promise<Ingredient | undefined>;
-  deleteIngredient(id: number): Promise<boolean>;
+  deleteIngredient(id: number, ownerId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -75,33 +80,75 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(products).orderBy(products.name);
   }
 
-  async getProduct(id: number): Promise<Product | undefined> {
+  async getProduct(id: number, ownerId: string): Promise<Product | undefined> {
+    const result = await db
+      .select()
+      .from(products)
+      .where(and(eq(products.id, id), eq(products.ownerId, ownerId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPublicProduct(id: number): Promise<Product | undefined> {
     const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
     return result[0];
   }
 
-  async createProduct(product: InsertProduct): Promise<Product> {
+  async createProduct(product: InsertProduct, baseUrl?: string): Promise<Product> {
     const result = await db.insert(products).values(product).returning();
+    const created = result[0];
+    if (created && !created.qrUrl && baseUrl) {
+      const qrUrl = `${baseUrl.replace(/\/$/, '')}/qr/product/${created.id}?src=qr`;
+      const [updated] = await db
+        .update(products)
+        .set({ qrUrl })
+        .where(eq(products.id, created.id))
+        .returning();
+      return updated || { ...created, qrUrl };
+    }
+    return created;
+  }
+
+  async updateProduct(
+    id: number,
+    ownerId: string,
+    product: Partial<InsertProduct>,
+  ): Promise<Product | undefined> {
+    // Preserve permanent qrUrl unless explicitly provided
+    const { qrUrl, ...updates } = product;
+    const updateData: Partial<InsertProduct> = qrUrl ? { ...updates, qrUrl } : updates;
+
+    const result = await db
+      .update(products)
+      .set(updateData)
+      .where(and(eq(products.id, id), eq(products.ownerId, ownerId)))
+      .returning();
     return result[0];
   }
 
-  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
-    const result = await db.update(products).set(product).where(eq(products.id, id)).returning();
-    return result[0];
-  }
-
-  async deleteProduct(id: number): Promise<boolean> {
-    const result = await db.delete(products).where(eq(products.id, id)).returning();
+  async deleteProduct(id: number, ownerId: string): Promise<boolean> {
+    const result = await db
+      .delete(products)
+      .where(and(eq(products.id, id), eq(products.ownerId, ownerId)))
+      .returning();
     return result.length > 0;
   }
 
   // Ingredient methods
-  async getIngredients(): Promise<Ingredient[]> {
-    return await db.select().from(ingredients).orderBy(ingredients.name);
+  async getIngredients(ownerId: string): Promise<Ingredient[]> {
+    return await db
+      .select()
+      .from(ingredients)
+      .where(eq(ingredients.ownerId, ownerId))
+      .orderBy(ingredients.name);
   }
 
-  async getIngredient(id: number): Promise<Ingredient | undefined> {
-    const result = await db.select().from(ingredients).where(eq(ingredients.id, id)).limit(1);
+  async getIngredient(id: number, ownerId: string): Promise<Ingredient | undefined> {
+    const result = await db
+      .select()
+      .from(ingredients)
+      .where(and(eq(ingredients.id, id), eq(ingredients.ownerId, ownerId)))
+      .limit(1);
     return result[0];
   }
 
@@ -112,18 +159,59 @@ export class DatabaseStorage implements IStorage {
 
   async updateIngredient(
     id: number,
+    ownerId: string,
     ingredient: Partial<InsertIngredient>,
   ): Promise<Ingredient | undefined> {
     const result = await db
       .update(ingredients)
       .set(ingredient)
-      .where(eq(ingredients.id, id))
+      .where(and(eq(ingredients.id, id), eq(ingredients.ownerId, ownerId)))
       .returning();
     return result[0];
   }
 
-  async deleteIngredient(id: number): Promise<boolean> {
-    const result = await db.delete(ingredients).where(eq(ingredients.id, id)).returning();
+  // Keeps the order the user picked, which is the order printed on the label
+  async getLabelIngredients(ids: number[] | null): Promise<LabelIngredient[]> {
+    if (!ids?.length) return [];
+    const rows = await db
+      .select({
+        id: ingredients.id,
+        name: ingredients.name,
+        eNumber: ingredients.eNumber,
+        allergens: ingredients.allergens,
+        category: ingredients.category,
+      })
+      .from(ingredients)
+      .where(inArray(ingredients.id, ids));
+    return ids.flatMap((id) => rows.filter((r) => r.id === id));
+  }
+
+  async createScan(scan: Omit<Scan, 'id' | 'createdAt'>): Promise<Scan> {
+    const result = await db.insert(scans).values(scan).returning();
+    return result[0];
+  }
+
+  async getScans() {
+    return await db
+      .select({
+        id: scans.id,
+        productId: scans.productId,
+        productName: products.name,
+        lat: scans.lat,
+        lng: scans.lng,
+        source: scans.source,
+        createdAt: scans.createdAt,
+      })
+      .from(scans)
+      .leftJoin(products, eq(scans.productId, products.id))
+      .orderBy(desc(scans.createdAt));
+  }
+
+  async deleteIngredient(id: number, ownerId: string): Promise<boolean> {
+    const result = await db
+      .delete(ingredients)
+      .where(and(eq(ingredients.id, id), eq(ingredients.ownerId, ownerId)))
+      .returning();
     return result.length > 0;
   }
 }

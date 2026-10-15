@@ -2,11 +2,19 @@ import type { Express } from 'express';
 import express from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
-import { insertProductSchema, insertIngredientSchema, importProductSchema } from '@shared/schema';
+import {
+  insertProductSchema,
+  insertIngredientSchema,
+  importProductSchema,
+  insertScanSchema,
+} from '@shared/schema';
 import multer from 'multer';
+import { put } from '@vercel/blob';
 import path from 'path';
 import fs from 'fs';
 import * as XLSX from 'xlsx';
+import { ZodError } from 'zod';
+import { getAuthenticatedUserId, requireAuth } from './supabase-auth';
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -73,6 +81,36 @@ const uploadExcel = multer({
   },
 });
 
+const uploadBlob = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Please upload an image file.'));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+export function getRequestBaseUrl(req: express.Request): string {
+  const clientBase = (req.body as any)?.baseUrl;
+  if (typeof clientBase === 'string' && clientBase.trim()) {
+    return clientBase.trim().replace(/\/$/, '');
+  }
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin && typeof origin === 'string') {
+    try {
+      const u = new URL(origin);
+      return `${u.protocol}//${u.host}`;
+    } catch {}
+  }
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL.replace(/\/$/, '');
+  }
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+  }
+  return 'https://wine-label-management-system.onrender.com';
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve uploaded files statically
   app.use('/uploads', express.static(uploadsDir));
@@ -80,23 +118,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Configuration endpoint
   app.get('/api/config', (req, res) => {
     res.json({
-      supabaseUrl: process.env.SUPABASE_URL,
-      supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY,
+      // Render sets RENDER_EXTERNAL_URL to the service's public https URL
+      publicUrl: process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL,
     });
   });
 
-  // Products routes
-  app.get('/api/products', async (req, res) => {
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+  // Geolocation detection and geocoding helper endpoints
+  app.get('/api/geolocation/detect', async (req, res) => {
     try {
+      let ip = req.headers['x-forwarded-for'];
+      if (Array.isArray(ip)) ip = ip[0];
+      if (typeof ip === 'string' && ip.includes(',')) ip = ip.split(',')[0].trim();
+
+      const isLocal =
+        !ip ||
+        ip === '::1' ||
+        ip === '127.0.0.1' ||
+        ip.startsWith('192.168.') ||
+        ip.startsWith('10.');
+
+      const ipQueryUrl = isLocal
+        ? 'https://ipwho.is/'
+        : `https://ipwho.is/${encodeURIComponent(ip as string)}`;
+
+      try {
+        const geoRes = await fetch(ipQueryUrl, { signal: AbortSignal.timeout(6000) });
+        const data = await geoRes.json();
+
+        if (data && data.success !== false && (data.latitude || data.city)) {
+          return res.json({
+            success: true,
+            latitude: data.latitude != null ? String(data.latitude) : '',
+            longitude: data.longitude != null ? String(data.longitude) : '',
+            city: data.city || '',
+            state: data.region || '',
+            country: data.country || '',
+            postalCode: data.postal || '',
+            address: [data.city, data.region, data.country].filter(Boolean).join(', '),
+            locationName: data.city ? `${data.city} Facility` : '',
+            source: 'ip',
+          });
+        }
+      } catch (e) {
+        console.warn('ipwho.is failed, trying ipapi.co fallback:', e);
+      }
+
+      // Fallback: ipapi.co
+      const fallbackRes = await fetch('https://ipapi.co/json/', {
+        signal: AbortSignal.timeout(6000),
+      });
+      if (fallbackRes.ok) {
+        const fbData = await fallbackRes.json();
+        return res.json({
+          success: true,
+          latitude: fbData.latitude != null ? String(fbData.latitude) : '',
+          longitude: fbData.longitude != null ? String(fbData.longitude) : '',
+          city: fbData.city || '',
+          state: fbData.region || '',
+          country: fbData.country_name || fbData.country || '',
+          postalCode: fbData.postal || '',
+          address: [fbData.city, fbData.region, fbData.country_name].filter(Boolean).join(', '),
+          locationName: fbData.city ? `${fbData.city} Facility` : '',
+          source: 'ip',
+        });
+      }
+
+      return res.status(404).json({ success: false, error: 'Could not determine location from IP' });
+    } catch (err: any) {
+      console.error('Geo detect error:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Geolocation detection failed' });
+    }
+  });
+
+  app.get('/api/geolocation/reverse', async (req, res) => {
+    try {
+      const lat = req.query.lat as string;
+      const lon = req.query.lon as string;
+      if (!lat || !lon) {
+        return res.status(400).json({ error: 'lat and lon query parameters required' });
+      }
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,
+        {
+          headers: {
+            'User-Agent': 'OpenELabel-App/1.0 (contact@openelabel.org)',
+          },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+
+      if (!response.ok) {
+        return res.status(502).json({ error: 'Reverse geocode service unavailable' });
+      }
+
+      const data = await response.json();
+      const addr = data.address || {};
+      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+      const state = addr.state || addr.region || '';
+      const country = addr.country || '';
+      const postalCode = addr.postcode || '';
+      const road = addr.road || addr.street || addr.pedestrian || '';
+      const houseNumber = addr.house_number || '';
+      const street = [houseNumber, road].filter(Boolean).join(' ');
+      const formattedAddress =
+        [street, city, state, postalCode, country].filter(Boolean).join(', ') || data.display_name || '';
+      const locationName =
+        addr.winery || addr.amenity || addr.building || (city ? `${city} Winery / Production Site` : '');
+
+      return res.json({
+        success: true,
+        latitude: lat,
+        longitude: lon,
+        locationName,
+        address: formattedAddress,
+        city,
+        state,
+        country,
+        postalCode,
+      });
+    } catch (err: any) {
+      console.error('Reverse geocode error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to reverse geocode' });
+    }
+  });
+
+  app.get('/api/geolocation/search', async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || !query.trim()) {
+        return res.status(400).json({ error: 'q query parameter required' });
+      }
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'OpenELabel-App/1.0 (contact@openelabel.org)',
+          },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+
+      if (!response.ok) {
+        return res.status(502).json({ error: 'Geocoding service unavailable' });
+      }
+
+      const results = await response.json();
+      if (!Array.isArray(results) || results.length === 0) {
+        return res.status(404).json({ error: 'Location not found' });
+      }
+
+      const item = results[0];
+      return res.json({
+        success: true,
+        latitude: item.lat,
+        longitude: item.lon,
+        displayName: item.display_name,
+      });
+    } catch (err: any) {
+      console.error('Geocoding search error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to search location' });
+    }
+  });
+
+  app.post('/api/get-url', requireAuth, uploadBlob.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
+    if (!process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN === 'token') {
+      // Self-hosted (Docker): keep images on the uploads volume
+      const filename = `image-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(req.file.originalname)}`;
+      await fs.promises.writeFile(path.join(uploadsDir, filename), req.file.buffer);
+      return res.status(200).json({ url: `/uploads/${filename}` });
+    }
+
+    try {
+      const blob = await put(`products/${Date.now()}-${req.file.originalname}`, req.file.buffer, {
+        access: 'public',
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      return res.status(200).json({ url: blob.url });
+    } catch (error) {
+      console.error('Image upload error:', error);
+      return res.status(500).json({ error: 'Failed to upload image' });
+    }
+  });
+
+  // Products routes
+  app.get('/api/products', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req);
       const products = await storage.getProducts();
-      res.json(products);
+      res.json(
+        products.map(({ ownerId, createdBy, ...product }) => ({
+          ...product,
+          canEdit: ownerId === userId,
+        })),
+      );
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch products' });
     }
   });
 
   // Export route must come before /:id route
-  app.get('/api/products/export', async (req, res) => {
+  app.get('/api/products/export', requireAuth, async (req, res) => {
     try {
       console.log('Starting products export...');
       const products = await storage.getProducts();
@@ -111,6 +339,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Sugar Content': product.sugarContent,
         Appellation: product.appellation,
         SKU: product.sku,
+        'Manufacturing Location': product.manufacturingLocation,
+        'Manufacturing Address': product.manufacturingAddress,
+        'Manufacturing City': product.manufacturingCity,
+        'Manufacturing Country': product.manufacturingCountry,
+        Latitude: product.latitude || product.manufacturingLatitude,
+        Longitude: product.longitude || product.manufacturingLongitude,
       }));
 
       console.log('Creating Excel worksheet...');
@@ -137,34 +371,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/products/:id', async (req, res) => {
+  app.get('/api/public/products/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const product = await storage.getProduct(id);
+      const product = await storage.getPublicProduct(id);
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
-      res.json(product);
+      const { createdBy, ownerId, ...publicProduct } = product;
+      const ingredients = await storage.getLabelIngredients(product.ingredientIds);
+      res.json({ ...publicProduct, ingredients });
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch product' });
     }
   });
 
-  app.post('/api/products', async (req, res) => {
+  // QR scans with a shared location (from the public page or the Python QR tool)
+  // ponytail: in-memory per-IP limit, resets on restart; use a shared store if running several replicas
+  const scanHits = new Map<string, { count: number; reset: number }>();
+  app.post('/api/public/scans', async (req, res) => {
+    const ip = req.ip || 'unknown';
+    const now = Date.now();
+    const hit = scanHits.get(ip);
+    if (!hit || hit.reset < now) {
+      if (scanHits.size > 10000) scanHits.clear();
+      scanHits.set(ip, { count: 1, reset: now + 60_000 });
+    } else if (++hit.count > 60) {
+      return res.status(429).json({ error: 'Too many scans, try again in a minute' });
+    }
+
+    const parsed = insertScanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid scan', details: parsed.error.issues });
+    }
     try {
-      const validatedData = insertProductSchema.parse(req.body);
-      const product = await storage.createProduct(validatedData);
-      res.status(201).json(product);
+      if (!(await storage.getPublicProduct(parsed.data.productId))) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      const scan = await storage.createScan({ source: null, ...parsed.data });
+      return res.status(201).json({ id: scan.id });
     } catch (error) {
-      res.status(400).json({ error: 'Invalid product data', details: error });
+      console.error('Scan save failed:', error);
+      return res.status(500).json({ error: 'Failed to save scan' });
     }
   });
 
-  app.put('/api/products/:id', async (req, res) => {
+  // Scan locations as GeoJSON (opens in any map tool); off unless SCANS_EXPORT_KEY is set
+  app.get('/api/scans.geojson', async (req, res) => {
+    const key = process.env.SCANS_EXPORT_KEY;
+    if (!key) return res.status(404).json({ error: 'Scan export is disabled (set SCANS_EXPORT_KEY)' });
+    if (req.query.key !== key) return res.status(401).json({ error: 'Invalid export key' });
+    try {
+      const rows = await storage.getScans();
+      return res.json({
+        type: 'FeatureCollection',
+        features: rows.map(({ lat, lng, ...props }) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [lng, lat] },
+          properties: props,
+        })),
+      });
+    } catch (error) {
+      console.error('Scan export failed:', error);
+      return res.status(500).json({ error: 'Failed to export scans' });
+    }
+  });
+
+  app.get('/api/products/:id', requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertProductSchema.partial().parse(req.body);
-      const product = await storage.updateProduct(id, validatedData);
+      const userId = getAuthenticatedUserId(req);
+      const product = await storage.getPublicProduct(id);
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+      const { ownerId, createdBy, ...visibleProduct } = product;
+      const ingredients = await storage.getLabelIngredients(product.ingredientIds);
+      return res.json({ ...visibleProduct, ingredients, canEdit: ownerId === userId });
+    } catch {
+      return res.status(500).json({ error: 'Failed to fetch product' });
+    }
+  });
+
+  app.post('/api/products', requireAuth, async (req, res) => {
+    let validatedData;
+    try {
+      validatedData = insertProductSchema.omit({ createdBy: true, ownerId: true }).parse(req.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: 'Invalid product data', details: error.issues });
+      }
+      console.error('Unexpected product validation error:', error);
+      return res.status(500).json({ error: 'Failed to validate product data' });
+    }
+
+    // Sync latitude / longitude and manufacturingLatitude / manufacturingLongitude
+    if (validatedData.latitude && !validatedData.manufacturingLatitude) {
+      validatedData.manufacturingLatitude = validatedData.latitude;
+    } else if (validatedData.manufacturingLatitude && !validatedData.latitude) {
+      validatedData.latitude = validatedData.manufacturingLatitude;
+    }
+    if (validatedData.longitude && !validatedData.manufacturingLongitude) {
+      validatedData.manufacturingLongitude = validatedData.longitude;
+    } else if (validatedData.manufacturingLongitude && !validatedData.longitude) {
+      validatedData.longitude = validatedData.manufacturingLongitude;
+    }
+
+    try {
+      const baseUrl = getRequestBaseUrl(req);
+      const product = await storage.createProduct(
+        {
+          ...validatedData,
+          createdBy: undefined,
+          ownerId: getAuthenticatedUserId(req),
+        },
+        baseUrl
+      );
+      return res.status(201).json(product);
+    } catch (error) {
+      console.error('Product creation failed:', error);
+      return res.status(500).json({ error: 'Failed to create product' });
+    }
+  });
+
+  app.put('/api/products/:id', requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertProductSchema
+        .partial()
+        .omit({ createdBy: true, ownerId: true, qrUrl: true })
+        .parse(req.body);
+
+      // Sync latitude / longitude and manufacturingLatitude / manufacturingLongitude
+      if (validatedData.latitude && !validatedData.manufacturingLatitude) {
+        validatedData.manufacturingLatitude = validatedData.latitude;
+      } else if (validatedData.manufacturingLatitude && !validatedData.latitude) {
+        validatedData.latitude = validatedData.manufacturingLatitude;
+      }
+      if (validatedData.longitude && !validatedData.manufacturingLongitude) {
+        validatedData.manufacturingLongitude = validatedData.longitude;
+      } else if (validatedData.manufacturingLongitude && !validatedData.longitude) {
+        validatedData.longitude = validatedData.manufacturingLongitude;
+      }
+
+      const product = await storage.updateProduct(id, getAuthenticatedUserId(req), validatedData);
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
@@ -174,10 +522,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/products/:id', async (req, res) => {
+  app.delete('/api/products/:id', requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const success = await storage.deleteProduct(id);
+      const success = await storage.deleteProduct(id, getAuthenticatedUserId(req));
       if (!success) {
         return res.status(404).json({ error: 'Product not found' });
       }
@@ -188,10 +536,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Image upload routes
-  app.post('/api/products/:id/image', upload.single('image'), async (req, res) => {
+  app.post('/api/products/:id/image', requireAuth, upload.single('image'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const product = await storage.getProduct(id);
+      const ownerId = getAuthenticatedUserId(req);
+      const product = await storage.getProduct(id, ownerId);
 
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
@@ -204,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const imageUrl = `/uploads/${req.file.filename}`;
 
       // Update product with new image URL
-      const updatedProduct = await storage.updateProduct(id, { imageUrl });
+      const updatedProduct = await storage.updateProduct(id, ownerId, { imageUrl });
 
       if (!updatedProduct) {
         return res.status(500).json({ error: 'Failed to update product' });
@@ -217,25 +566,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/products/:id/image', async (req, res) => {
+  app.delete('/api/products/:id/image', requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const product = await storage.getProduct(id);
+      const ownerId = getAuthenticatedUserId(req);
+      const product = await storage.getProduct(id, ownerId);
 
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
       if (product.imageUrl) {
-        // Delete the image file from disk
-        const imagePath = path.join(process.cwd(), product.imageUrl);
+        // Delete the image file from disk if stored in local uploads
+        const filename = path.basename(product.imageUrl);
+        const imagePath = path.join(uploadsDir, filename);
         if (fs.existsSync(imagePath)) {
           fs.unlinkSync(imagePath);
         }
       }
 
       // Remove image URL from product
-      const updatedProduct = await storage.updateProduct(id, { imageUrl: null });
+      const updatedProduct = await storage.updateProduct(id, ownerId, { imageUrl: null });
 
       if (!updatedProduct) {
         return res.status(500).json({ error: 'Failed to update product' });
@@ -249,9 +600,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ingredients routes
-  app.get('/api/ingredients', async (req, res) => {
+  app.get('/api/ingredients', requireAuth, async (req, res) => {
     try {
-      const ingredients = await storage.getIngredients();
+      const ingredients = await storage.getIngredients(getAuthenticatedUserId(req));
       res.json(ingredients);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch ingredients' });
@@ -259,10 +610,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export route must come before the parameterized route
-  app.get('/api/ingredients/export', async (req, res) => {
+  app.get('/api/ingredients/export', requireAuth, async (req, res) => {
     try {
       console.log('Starting ingredients export...');
-      const ingredients = await storage.getIngredients();
+      const ingredients = await storage.getIngredients(getAuthenticatedUserId(req));
       console.log(`Found ${ingredients.length} ingredients to export`);
 
       // Transform ingredients for Excel export
@@ -301,10 +652,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/ingredients/:id', async (req, res) => {
+  app.get('/api/ingredients/:id', requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const ingredient = await storage.getIngredient(id);
+      const ingredient = await storage.getIngredient(id, getAuthenticatedUserId(req));
       if (!ingredient) {
         return res.status(404).json({ error: 'Ingredient not found' });
       }
@@ -314,21 +665,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/ingredients', async (req, res) => {
+  app.post('/api/ingredients', requireAuth, async (req, res) => {
     try {
-      const validatedData = insertIngredientSchema.parse(req.body);
-      const ingredient = await storage.createIngredient(validatedData);
+      const validatedData = insertIngredientSchema.omit({ createdBy: true, ownerId: true }).parse(req.body);
+      const ingredient = await storage.createIngredient({
+        ...validatedData,
+        createdBy: undefined,
+        ownerId: getAuthenticatedUserId(req),
+      });
       res.status(201).json(ingredient);
     } catch (error) {
       res.status(400).json({ error: 'Invalid ingredient data', details: error });
     }
   });
 
-  app.put('/api/ingredients/:id', async (req, res) => {
+  app.put('/api/ingredients/:id', requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertIngredientSchema.partial().parse(req.body);
-      const ingredient = await storage.updateIngredient(id, validatedData);
+      const validatedData = insertIngredientSchema
+        .partial()
+        .omit({ createdBy: true, ownerId: true })
+        .parse(req.body);
+      const ingredient = await storage.updateIngredient(id, getAuthenticatedUserId(req), validatedData);
       if (!ingredient) {
         return res.status(404).json({ error: 'Ingredient not found' });
       }
@@ -338,10 +696,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/ingredients/:id', async (req, res) => {
+  app.delete('/api/ingredients/:id', requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const success = await storage.deleteIngredient(id);
+      const success = await storage.deleteIngredient(id, getAuthenticatedUserId(req));
       if (!success) {
         return res.status(404).json({ error: 'Ingredient not found' });
       }
@@ -352,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Excel Import/Export routes for Products
-  app.post('/api/products/import', uploadExcel.single('file'), async (req, res) => {
+  app.post('/api/products/import', requireAuth, uploadExcel.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -370,8 +728,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Sample row data:', data[0]);
       console.log('All column names from first row:', Object.keys(data[0] || {}));
 
-      const importedProducts = [];
-      const errors = [];
+      const importedProducts: Awaited<ReturnType<typeof storage.createProduct>>[] = [];
+      const errors: string[] = [];
 
       for (let i = 0; i < data.length; i++) {
         try {
@@ -431,7 +789,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          const product = await storage.createProduct(result.data);
+          const baseUrl = getRequestBaseUrl(req);
+          const product = await storage.createProduct(
+            {
+              ...result.data,
+              createdBy: undefined,
+              ownerId: getAuthenticatedUserId(req),
+            },
+            baseUrl
+          );
           importedProducts.push(product);
           console.log(`Successfully imported product: ${product.name}`);
         } catch (error) {
@@ -457,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Excel Import/Export routes for Ingredients
-  app.post('/api/ingredients/import', uploadExcel.single('file'), async (req, res) => {
+  app.post('/api/ingredients/import', requireAuth, uploadExcel.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -468,8 +834,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const worksheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(worksheet);
 
-      const importedIngredients = [];
-      const errors = [];
+      const importedIngredients: Awaited<ReturnType<typeof storage.createIngredient>>[] = [];
+      const errors: string[] = [];
 
       for (let i = 0; i < data.length; i++) {
         try {
@@ -507,7 +873,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          const ingredient = await storage.createIngredient(result.data);
+          const ingredient = await storage.createIngredient({
+            ...result.data,
+            createdBy: undefined,
+            ownerId: getAuthenticatedUserId(req),
+          });
           importedIngredients.push(ingredient);
         } catch (error) {
           errors.push(`Row ${i + 2}: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="container flex items-center justify-center min-h-screen py-12">
+    <div className="container flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Reset Password</CardTitle>
@@ -89,7 +89,7 @@ export default function ResetPasswordPage() {
               <Button variant="outline" className="mt-4" onClick={() => setEmailSent(false)}>
                 Try again
               </Button>
-              <Link href="/login" className="text-primary hover:underline block mt-4">
+              <Link href="/login" className="mt-4 block font-medium text-primary underline underline-offset-4">
                 Back to login
               </Link>
             </div>
@@ -119,7 +119,7 @@ export default function ResetPasswordPage() {
                 </Button>
 
                 <div className="text-center mt-4">
-                  <Link href="/login" className="text-primary hover:underline">
+                  <Link href="/login" className="font-medium text-primary underline underline-offset-4">
                     Back to login
                   </Link>
                 </div>

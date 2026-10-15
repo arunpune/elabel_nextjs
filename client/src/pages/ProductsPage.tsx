@@ -2,14 +2,15 @@ import { useState, useRef } from 'react';
 import { Plus, Upload, Download, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import ProductsTable from '@/components/tables/ProductsTable';
 import ProductPreviewModal from '@/components/modals/ProductPreviewModal';
 import DeleteConfirmationModal from '@/components/modals/DeleteConfirmationModal';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
-import type { Product } from '@shared/schema';
+import { apiFetch, apiRequest } from '@/lib/queryClient';
+import type { Product, ProductWithPermissions } from '@shared/schema';
 
 export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,7 +22,7 @@ export default function ProductsPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const { data: products = [], isLoading } = useQuery<ProductWithPermissions[]>({
     queryKey: ['/api/products'],
     queryFn: () => apiRequest('/api/products'),
   });
@@ -72,10 +73,13 @@ export default function ProductsPage() {
     mutationFn: (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      return fetch('/api/products/import', {
+      return apiFetch('/api/products/import', {
         method: 'POST',
         body: formData,
-      }).then((res) => res.json());
+      }).then(async (res) => {
+        if (!res.ok) throw new Error('Failed to import products');
+        return res.json();
+      });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
@@ -95,8 +99,11 @@ export default function ProductsPage() {
 
   const exportProductsMutation = useMutation({
     mutationFn: () =>
-      fetch('/api/products/export')
-        .then((res) => res.blob())
+      apiFetch('/api/products/export')
+        .then((res) => {
+          if (!res.ok) throw new Error('Failed to export products');
+          return res.blob();
+        })
         .then((blob) => {
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -177,8 +184,8 @@ export default function ProductsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Products</h1>
-        <p className="text-gray-600">Manage your product inventory and details</p>
+        <h1 className="text-4xl">Products</h1>
+        <p className="mt-2 text-muted-foreground">Each product has its own label and public passport.</p>
       </div>
 
       {/* Actions Bar */}
@@ -186,25 +193,25 @@ export default function ProductsPage() {
         <div className="flex flex-wrap gap-3">
           <Button
             onClick={() => setLocation('/products/create')}
-            className="bg-primary hover:bg-primary/90 text-white font-medium"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Create New
+            New product
           </Button>
           <Button variant="outline" onClick={handleImport}>
             <Upload className="w-4 h-4 mr-2" />
-            Import
+            Import Excel
           </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export Excel
           </Button>
         </div>
 
         <div className="relative w-full sm:w-auto">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search products..."
+            placeholder="Search products"
+            aria-label="Search products"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 w-full sm:w-64"
@@ -213,13 +220,34 @@ export default function ProductsPage() {
       </div>
 
       {/* Products Table */}
-      <ProductsTable
-        products={filteredProducts}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onDuplicate={handleDuplicate}
-        onPreview={handlePreview}
-      />
+      {isLoading ? (
+        <div className="space-y-2" aria-busy="true" aria-label="Loading products">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      ) : products.length === 0 ? (
+        <div role="status" className="rounded-[10px] border border-dashed bg-card px-6 py-16 text-center">
+          <h2 className="text-lg font-semibold">No products yet</h2>
+          <p className="mt-1 text-muted-foreground">Create your first wine, or import a list from Excel.</p>
+          <Button className="mt-6" onClick={() => setLocation('/products/create')}>
+            <Plus className="mr-2 h-4 w-4" />
+            New product
+          </Button>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <p role="status" className="rounded-[10px] border bg-card px-6 py-12 text-center text-muted-foreground">
+          No products match &ldquo;{searchTerm}&rdquo;.
+        </p>
+      ) : (
+        <ProductsTable
+          products={filteredProducts}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
+          onPreview={handlePreview}
+        />
+      )}
 
       {/* Hidden file input for Excel import */}
       <input
