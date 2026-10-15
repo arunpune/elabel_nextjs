@@ -2,6 +2,38 @@
 
 A full-stack web application for wine producers to manage wine inventory, generate EU-compliant Digital Product Passports (DPP), render and print standardized bottle labels with QR codes, and track supply chain traceability.
 
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Local Setup](#local-setup)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Docker Setup](#docker-setup)
+- [Development Commands](#development-commands)
+- [Project Structure](#project-structure)
+- [API Endpoints](#api-endpoints)
+  - [System & Configuration](#system--configuration)
+  - [Public & Digital Product Passport (DPP)](#public--digital-product-passport-dpp)
+  - [Geolocation & Traceability](#geolocation--traceability)
+  - [Products](#products--requires-authentication)
+  - [Ingredients](#ingredients--requires-authentication)
+- [Database Schema](#database-schema)
+  - [Products Table](#products-table-products)
+  - [Ingredients Table](#ingredients-table-ingredients)
+  - [Scans Table](#scans-table-scans)
+  - [Users Table](#users-table-users)
+- [Import/Export Format](#importexport-format)
+  - [Products Excel Format](#products-excel-format)
+  - [Ingredients Excel Format](#ingredients-excel-format)
+- [Deployment](#deployment)
+  - [Render (Live Deployment)](#render-live-deployment)
+  - [Docker (Self-Hosted)](#docker-self-hosted)
+  - [Sentry (Error Monitoring)](#sentry-error-monitoring)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Features
 
 - **Product Management**: Create, edit, duplicate, and delete wine products with detailed oenological, nutritional, and logistical data.
