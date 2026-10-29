@@ -2,8 +2,15 @@
 
 A full-stack web application for wine producers to manage wine inventory, generate EU-compliant Digital Product Passports (DPP), render and print standardized bottle labels with QR codes, and track supply chain traceability.
 
+> 🌐 **Live Demo**: [https://wine-label-management-system.onrender.com](https://wine-label-management-system.onrender.com)  
+> 📦 **GitHub Repository**: [https://github.com/arunpune/elabel_nextjs](https://github.com/arunpune/elabel_nextjs)  
+> 🔑 **Demo Admin Credentials**:
+> - **Email**: `admin@gmail.com`
+> - **Password**: `Admin@123`
+
 ## Table of Contents
 
+- [Live Demo & Credentials](#live-demo--credentials)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Local Setup](#local-setup)
@@ -33,6 +40,22 @@ A full-stack web application for wine producers to manage wine inventory, genera
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Live Demo & Credentials
+
+The application is deployed live and fully functional on Render:
+
+- **Live URL**: [https://wine-label-management-system.onrender.com](https://wine-label-management-system.onrender.com)
+- **Main Repository**: [https://github.com/arunpune/elabel_nextjs](https://github.com/arunpune/elabel_nextjs)
+
+### Demo Admin Account
+
+Use the following credentials to access the producer dashboard, wine catalog, and label generator:
+
+| Field | Value |
+|---|---|
+| **Email** | `admin@gmail.com` |
+| **Password** | `Admin@123` |
 
 ## Features
 
@@ -75,7 +98,7 @@ A full-stack web application for wine producers to manage wine inventory, genera
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/arunpune/elabel_nextjs.git
    cd elabel_nextjs
    ```
 

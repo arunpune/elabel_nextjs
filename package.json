@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arunpune/elabel_nextjs.git"
+  },
   "scripts": {
     "dev": "node ./scripts/dev.mjs server/index.ts",
     "build": "vite build && esbuild server/production.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/index.js",
