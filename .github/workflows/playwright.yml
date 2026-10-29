@@ -19,6 +19,12 @@ jobs:
         run: npx playwright install --with-deps
       - name: Run Playwright tests
         run: npx playwright test
+        env:
+          NODE_ENV: development
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder
+          SESSION_SECRET: test-session-secret-key-1234567890
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
