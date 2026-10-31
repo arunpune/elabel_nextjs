@@ -102,9 +102,11 @@ export default function LoginPage() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel htmlFor="email">Email</FormLabel>
                         <FormControl>
                           <Input
+                            id="email"
+                            aria-label="Email"
                             placeholder="Enter your email"
                             type="email"
                             {...field}
@@ -121,10 +123,12 @@ export default function LoginPage() {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel htmlFor="password">Password</FormLabel>
                         <div className="relative">
                           <FormControl>
                             <Input
+                              id="password"
+                              aria-label="Password"
                               placeholder="Enter your password"
                               type={showPassword ? 'text' : 'password'}
                               {...field}
@@ -137,7 +141,8 @@ export default function LoginPage() {
                             variant="ghost"
                             size="icon"
                             className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            aria-label={showPassword ? 'Hide' : 'Show'}
+                            title={showPassword ? 'Hide password' : 'Show password'}
                             aria-pressed={showPassword}
                             onClick={() => setShowPassword((visible) => !visible)}
                           >

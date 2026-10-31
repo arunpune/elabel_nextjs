@@ -2,8 +2,15 @@
 
 A full-stack web application for wine producers to manage wine inventory, generate EU-compliant Digital Product Passports (DPP), render and print standardized bottle labels with QR codes, and track supply chain traceability.
 
+> 🌐 **Live Demo**: [https://wine-label-management-system.onrender.com](https://wine-label-management-system.onrender.com)  
+> 📦 **GitHub Repository**: [https://github.com/arunpune/elabel_nextjs](https://github.com/arunpune/elabel_nextjs)  
+> 🔑 **Demo Admin Credentials**:
+> - **Email**: `admin@gmail.com`
+> - **Password**: `Admin@123`
+
 ## Table of Contents
 
+- [Live Demo & Credentials](#live-demo--credentials)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Local Setup](#local-setup)
@@ -33,6 +40,22 @@ A full-stack web application for wine producers to manage wine inventory, genera
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Live Demo & Credentials
+
+The application is deployed live and fully functional on Render:
+
+- **Live URL**: [https://wine-label-management-system.onrender.com](https://wine-label-management-system.onrender.com)
+- **Main Repository**: [https://github.com/arunpune/elabel_nextjs](https://github.com/arunpune/elabel_nextjs)
+
+### Demo Admin Account
+
+Use the following credentials to access the producer dashboard, wine catalog, and label generator:
+
+| Field | Value |
+|---|---|
+| **Email** | `admin@gmail.com` |
+| **Password** | `Admin@123` |
 
 ## Features
 
@@ -75,7 +98,7 @@ A full-stack web application for wine producers to manage wine inventory, genera
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/arunpune/elabel_nextjs.git
    cd elabel_nextjs
    ```
 
@@ -396,8 +419,16 @@ When importing ingredients via Excel (`.xlsx`) or CSV, the spreadsheet must incl
 
 ### Render (Live Deployment)
 
-The live application is hosted on Render as a Node Web Service connected to GitHub repository `om-bagade2007/elabel_nextjs`.
+The live application is hosted on Render as a Node Web Service connected to GitHub repository `arunpune/elabel_nextjs` (or fork `om-bagade2007/elabel_nextjs`).
 
+#### Automated Deployment with `render.yaml` (Blueprint)
+
+The repository includes a root `render.yaml` file for automated infrastructure as code deployment:
+1. In the [Render Dashboard](https://dashboard.render.com), click **New** ➔ **Blueprint**.
+2. Connect this GitHub repository.
+3. Render automatically reads `render.yaml`, configures the Node web service, builds the app, sets health checks, and enables **auto-deploy on push to `main`**.
+
+#### Manual Service Configuration (if not using Blueprint):
 1. **Service Configuration**:
    - **Environment**: Node
    - **Build Command**: `npm install --include=dev && npm run build`
