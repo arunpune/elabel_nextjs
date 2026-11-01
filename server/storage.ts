@@ -16,8 +16,9 @@ import {
   type Scan,
 } from '@shared/schema';
 
-const connectionString =
-  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/postgres';
+let rawConn = (process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/postgres').trim();
+if (rawConn.startsWith('=')) rawConn = rawConn.substring(1).trim();
+const connectionString = rawConn;
 const client = postgres(connectionString, { max: 1, idle_timeout: 20, connect_timeout: 10, ssl: process.env.DATABASE_URL ? 'require' : undefined });
 export const db = drizzle(client);
 

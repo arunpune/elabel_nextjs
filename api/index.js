@@ -242,7 +242,9 @@ var insertIngredientSchema = z.object({
 });
 
 // server/storage.ts
-var connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres";
+var rawConn = (process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres").trim();
+if (rawConn.startsWith("=")) rawConn = rawConn.substring(1).trim();
+var connectionString = rawConn;
 var client = postgres(connectionString, { max: 1, idle_timeout: 20, connect_timeout: 10, ssl: process.env.DATABASE_URL ? "require" : void 0 });
 var db = drizzle(client);
 var DatabaseStorage = class {
@@ -1155,7 +1157,9 @@ CREATE INDEX IF NOT EXISTS scans_product_id_idx ON scans(product_id);`
 ];
 async function ensureSchema(url = process.env.DATABASE_URL) {
   if (!url) return;
-  const sql = postgres2(url, { max: 1, onnotice: () => {
+  let cleanUrl = url.trim();
+  if (cleanUrl.startsWith("=")) cleanUrl = cleanUrl.substring(1).trim();
+  const sql = postgres2(cleanUrl, { max: 1, onnotice: () => {
   }, ssl: "require" });
   try {
     for (const migration of MIGRATIONS) {

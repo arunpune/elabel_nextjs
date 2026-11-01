@@ -46,7 +46,9 @@ CREATE INDEX IF NOT EXISTS scans_product_id_idx ON scans(product_id);`,
 
 export async function ensureSchema(url = process.env.DATABASE_URL) {
   if (!url) return;
-  const sql = postgres(url, { max: 1, onnotice: () => {}, ssl: 'require' });
+  let cleanUrl = url.trim();
+  if (cleanUrl.startsWith('=')) cleanUrl = cleanUrl.substring(1).trim();
+  const sql = postgres(cleanUrl, { max: 1, onnotice: () => {}, ssl: 'require' });
   try {
     for (const migration of MIGRATIONS) {
       let content = migration.sql;
