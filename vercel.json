@@ -3,15 +3,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://wine-label-management-system.onrender.com/api/:path*"
+      "destination": "/api"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://wine-label-management-system.onrender.com/uploads/:path*"
-    },
-    {
-      "source": "/dpp/:path*",
-      "destination": "https://wine-label-management-system.onrender.com/dpp/:path*"
+      "destination": "/api"
     },
     {
       "source": "/(.*)",
