@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
-import { registerRoutes } from '../server/routes';
-import { ensureSchema } from '../server/migrate';
+import { registerRoutes } from './routes';
+import { ensureSchema } from './migrate';
 
 const app = express();
 
