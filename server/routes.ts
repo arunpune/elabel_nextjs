@@ -17,9 +17,9 @@ import { ZodError } from 'zod';
 import { getAuthenticatedUserId, requireAuth } from './supabase-auth';
 
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(process.cwd(), 'uploads');
+const uploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+  try { fs.mkdirSync(uploadsDir, { recursive: true }); } catch (err) { console.warn(err); }
 }
 
 // Configure multer for image uploads

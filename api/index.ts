@@ -13,6 +13,17 @@ app.use(
   }),
 );
 
+// Normalize req.url when rewritten on Vercel
+app.use((req, _res, next) => {
+  const original = (req.headers['x-matched-path'] ||
+    req.headers['x-forwarded-uri'] ||
+    req.url) as string;
+  if (original && original.startsWith('/api')) {
+    req.url = original;
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
