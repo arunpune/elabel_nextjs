@@ -2,7 +2,7 @@
 
 A full-stack web application for wine producers to manage wine inventory, generate EU-compliant Digital Product Passports (DPP), render and print standardized bottle labels with QR codes, and track supply chain traceability.
 
-> 🌐 **Live Demo**: [https://wine-label-management-system.onrender.com](https://wine-label-management-system.onrender.com)  
+> 🌐 **Live Demo**: [https://elabel-nextjs-six.vercel.app](https://elabel-nextjs-six.vercel.app)  
 > 📦 **GitHub Repository**: [https://github.com/arunpune/elabel_nextjs](https://github.com/arunpune/elabel_nextjs)  
 > 🔑 **Demo Admin Credentials**:
 > - **Email**: `admin@gmail.com`
@@ -43,9 +43,9 @@ A full-stack web application for wine producers to manage wine inventory, genera
 
 ## Live Demo & Credentials
 
-The application is deployed live and fully functional on Render:
+The application is deployed live on Vercel:
 
-- **Live URL**: [https://wine-label-management-system.onrender.com](https://wine-label-management-system.onrender.com)
+- **Live URL**: [https://elabel-nextjs-six.vercel.app](https://elabel-nextjs-six.vercel.app)
 - **Main Repository**: [https://github.com/arunpune/elabel_nextjs](https://github.com/arunpune/elabel_nextjs)
 
 ### Demo Admin Account
